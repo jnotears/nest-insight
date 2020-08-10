@@ -8,6 +8,7 @@ import { ColumnModule } from './g-columns/column.module';
 import { entities } from './helper/entities';
 import { MilestoneModule } from './g-milestones/milestone.module';
 import { RepositoryModule } from './g-repositories/repository.module';
+import { ProjectModule } from './g-projects/project.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { RepositoryModule } from './g-repositories/repository.module';
     ColumnModule,
     MilestoneModule,
     RepositoryModule,
+    ProjectModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost',

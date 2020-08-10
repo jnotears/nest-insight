@@ -1,12 +1,18 @@
-import {Entity, PrimaryGeneratedColumn, Column} from 'typeorm';
+import { Entity, PrimaryColumn, Column } from 'typeorm';
 
 @Entity()
-export class Project{
-    @PrimaryGeneratedColumn()
+export class GProject {
+    @PrimaryColumn()
     id: number;
 
     @Column()
+    number: number;
+
+    @Column()
     name: string;
+    
+    @Column()
+    content: string;
 
     @Column()
     state: string;
