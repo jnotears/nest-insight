@@ -17,20 +17,25 @@ export class ColumnService {
         @InjectRepository(GColumn) private readonly gColRepository: Repository<GColumn>
     ) { }
 
-    getColumns(owner: string, repositoryName: string): Observable<AxiosResponse<any>> {
+    getColumns(username): Observable<AxiosResponse<any>> {
         const graph = `{
-                repository(owner: "${owner}", name: "${repositoryName}"){
-                    projects(last:100){
-                        edges{
-                            node{
-                                databaseId
-                                columns(last:100){
-                                    edges{
-                                        node{
-                                            databaseId
-                                            name
-                                            createdAt
-                                            updatedAt
+            user(login: "${username}"){
+                repositories(last:100){
+                    edges{
+                        node{
+                            projects(last: 100){
+                                edges{
+                                    node{
+                                        databaseId
+                                        columns(last:10){
+                                            edges{
+                                                node{
+                                                    databaseId
+                                                    name
+                                                    createdAt
+                                                    updatedAt
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -38,7 +43,8 @@ export class ColumnService {
                         }
                     }
                 }
-            }`;
+            }
+        }`;
         const query = { "query": this.converter.stringToGraphQl(graph) };
         return this.http.post<any>(gitGraphqlApiUrl, query, httpOptions);
     }
@@ -52,23 +58,30 @@ export class ColumnService {
         return gColumn;
     }
 
-    fillData(owner: string, repositoryName: string) {
-        this.getColumns(owner, repositoryName).subscribe(
+    fillData(username: string) {
+        this.getColumns(username).subscribe(
             val => {
-                const projects = val.data.data.repository.projects.edges;
-                if (projects) {
-                    for (let project of projects) {
-                        const projectId = project.node.databaseId;
-                        const columns = project.node.columns.edges;
-                        for (let column of columns) {
-                            const gColumn: ColumnDTO = this.getColumnNode(column.node);
-                            if (gColumn) {
-                                gColumn.projectId = projectId;
-                                this.gColRepository.save(gColumn);
+                const repositories = val.data.data.user.repositories.edges;
+                if(repositories && repositories.length > 0){
+                    for(let repository of repositories){
+                        const projects = repository.node.projects.edges;
+                        if (projects && projects.length > 0) {
+                            for (let project of projects) {
+                                const projectId = project.node.databaseId;
+                                const columns = project.node.columns.edges;
+                                if(columns && columns.length > 0){
+                                    for (let column of columns) {
+                                        const gColumn: ColumnDTO = this.getColumnNode(column.node);
+                                        if (gColumn) {
+                                            gColumn.projectId = projectId;
+                                            this.gColRepository.save(gColumn);
+                                        }
+                                    }
+                                } 
                             }
                         }
                     }
-                }
+                } 
             }
         );
     }

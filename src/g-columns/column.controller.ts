@@ -11,6 +11,6 @@ export class ColumnController {
     ///for testing
     @Get()
     getColumns() {
-        this.col.fillData("jnotears", "angular-shopping-app");
+        this.col.fillData("jnotears");
     }
 }
