@@ -7,6 +7,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ColumnModule } from './g-columns/column.module';
 import { entities } from './helper/entities';
 import { MilestoneModule } from './g-milestones/milestone.module';
+import { ColumnService } from './g-columns/column.service';
+import { Converter } from './helper/converter';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { MilestoneModule } from './g-milestones/milestone.module';
     })
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+  ],
 })
 export class AppModule { }

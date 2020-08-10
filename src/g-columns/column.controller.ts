@@ -10,6 +10,7 @@ export class ColumnController {
 
     @Get()
     getColumns() {
-        this.col.getColumns("jnotears", "angular-shopping-app").subscribe(val => console.log(JSON.stringify(val.data, null, 2)));
+        this.col.fillData("jnotears", "angular-shopping-app");
+        //this.col.getColumns("jnotears", "angular-shopping-app").subscribe(val => console.log(JSON.stringify(val.data, null, 2)));
     }
 }

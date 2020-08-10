@@ -1,8 +1,8 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, PrimaryColumn } from 'typeorm';
 
 @Entity()
 export class GColumn {
-    @PrimaryGeneratedColumn()
+    @PrimaryColumn()
     id: number;
 
     @Column()
@@ -12,8 +12,8 @@ export class GColumn {
     projectId: number;
 
     @Column()
-    createAt: Date;
+    createdAt: Date;
 
     @Column()
-    updateAt: Date;
+    updatedAt: Date;
 }

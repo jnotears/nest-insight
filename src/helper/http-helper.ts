@@ -1,7 +1,7 @@
 export const httpOptions = {
     headers: {
       "Content-Type": "application/json",
-      "Authorization": "Bearer 2c6b0ff843a80bdbb5023dc2f9da48cc13a8ed7b"
+      "Authorization": "Bearer d56d976730abf48d0140ee71fd364ce9ad8a3c15"
     },
 };
 
