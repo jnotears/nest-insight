@@ -5,7 +5,7 @@ import { gitGraphqlApiUrl, httpOptions } from '../helper/http-helper';
 import { Converter } from 'src/helper/converter';
 import { IssueDTO } from 'src/dto/issue.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Issue } from './issue.entity';
+import { GIssue } from './issue.entity';
 import { Repository } from 'typeorm';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class IssueService {
     constructor(
         private readonly http: HttpService,
         private readonly converter: Converter,
-        @InjectRepository(Issue) private readonly issueRepository: Repository<Issue>
+        @InjectRepository(GIssue) private readonly issueRepository: Repository<GIssue>
     ) { }
 
     getIssues(owner: string, repositoryName: string): Observable<AxiosResponse<any>> {
@@ -51,7 +51,7 @@ export class IssueService {
         return issue;
     }
 
-    fillData(owner: string, repositoryName: string){
+    fillData(owner: string, repositoryName: string): boolean{
         this.getIssues(owner,repositoryName).subscribe(
             val => {
                 const issues = val.data.data.repository.issues.edges;
@@ -62,28 +62,13 @@ export class IssueService {
                         if(gIssue){
                             gIssue.repositoryId = repositoryId;
                             this.issueRepository.save(gIssue);
-                            console.log("issue",gIssue);
+                        }else{
+                            return false;
                         }
                     }
                 }
             }
         )
+        return true;
     }
-    // getIssue(owner: string,repositoryName: string, number: number): Observable<AxiosResponse<any>> {
-    //     const graph = `{
-    //         repository(owner: ${owner}, name: ${repositoryName}){
-    //             issue(number: ${number}){
-    //                 databaseId
-    //                 title
-    //                 url
-    //                 author{
-    //                     login
-    //                 }
-    //                 body
-    //             }
-    //         }
-    //     }`;
-    //     const query = {"query": this.converter.stringToGraphQl(graph)};
-    //     return this.http.post<any>(gitGraphqlApiUrl, query, httpOptions);
-    // }
 }

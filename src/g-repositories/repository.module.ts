@@ -1,12 +1,19 @@
-import { Module } from '@nestjs/common';
+import { Module, HttpService, HttpModule } from '@nestjs/common';
 import { RepositoryService } from './repository.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Repository } from '../g-repositories/repository.entity';
+import { GRepository } from '../g-repositories/repository.entity';
+import { RepositoryController } from './repository.controller';
+import { Converter } from 'src/helper/converter';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Repository])
+        TypeOrmModule.forFeature([GRepository]),
+        HttpModule
     ],
-    providers: [RepositoryService]
+    controllers: [RepositoryController],
+    providers: [
+        RepositoryService,
+        Converter
+    ]
 })
 export class RepositoryModule { }

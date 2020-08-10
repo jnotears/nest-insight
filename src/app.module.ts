@@ -7,8 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ColumnModule } from './g-columns/column.module';
 import { entities } from './helper/entities';
 import { MilestoneModule } from './g-milestones/milestone.module';
-import { ColumnService } from './g-columns/column.service';
-import { Converter } from './helper/converter';
+import { RepositoryModule } from './g-repositories/repository.module';
 
 @Module({
   imports: [
@@ -17,6 +16,7 @@ import { Converter } from './helper/converter';
     IssueModule,
     ColumnModule,
     MilestoneModule,
+    RepositoryModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost',

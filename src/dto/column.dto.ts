@@ -1,4 +1,4 @@
-export class GColumnDTO{
+export class ColumnDTO{
     id: number;
     name: string;
     projectId: number;
