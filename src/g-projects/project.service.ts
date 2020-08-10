@@ -65,7 +65,7 @@ export class ProjectService {
                             const projects = repository.node.projects.edges;
                             if (projects && projects.length > 0) {
                                 for (let project of projects) {
-                                    const proj = this.getProjectNode(project.node);
+                                    const proj: ProjectDTO = this.getProjectNode(project.node);
                                     if (proj) {
                                         proj.repositoryId = repositoryId;
                                         this.projectRepository.save(proj);

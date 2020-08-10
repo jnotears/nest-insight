@@ -42,16 +42,16 @@ export class RepositoryService {
         repository.id = node["databaseId"];
         repository.name = node["name"];
         repository.owner = node["owner"].login;
-        return
+        return repository;
     }
 
     fillData(username: string) {
         this.getRepositories(username).subscribe(
             val => {
                 const repositories = val.data.data.user.repositories.edges;
-                if (repositories) {
+                if (repositories && repositories.length > 0) {
                     for (let repo of repositories) {
-                        const repository: RepositoryDTO = this.getRepositoryNode(repositories.node);
+                        const repository: RepositoryDTO = this.getRepositoryNode(repo.node);
                         if (repository) {
                             this.repo.save(repository);
                         }
