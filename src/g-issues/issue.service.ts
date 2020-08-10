@@ -17,20 +17,26 @@ export class IssueService {
         @InjectRepository(GIssue) private readonly issueRepository: Repository<GIssue>
     ) { }
 
-    getIssues(owner: string, repositoryName: string): Observable<AxiosResponse<any>> {
+    getIssues(username: string): Observable<AxiosResponse<any>> {
         const graph = `{
-            repository(owner: "${owner}", name: "${repositoryName}"){
-                databaseId
-                issues(last: 100){
+            user(login: "${username}"){
+                repositories(last:100){
                     edges{
                         node{
                             databaseId
-                            number
-                            title
-                            body
-                            url
-                            author{
-                                login
+                            issues(last: 100){
+                                edges{
+                                    node{
+                                        databaseId
+                                        number
+                                        title
+                                        body
+                                        url
+                                        author{
+                                            login
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -51,17 +57,22 @@ export class IssueService {
         return issue;
     }
 
-    fillData(owner: string, repositoryName: string){
-        this.getIssues(owner,repositoryName).subscribe(
+    fillData(username: string){
+        this.getIssues(username).subscribe(
             val => {
-                const issues = val.data.data.repository.issues.edges;
-                const repositoryId = val.data.data.repository.databaseId;
-                if(issues){
-                    for(let issue of issues){
-                        const gIssue = this.getIssueNode(issue.node);
-                        if(gIssue){
-                            gIssue.repositoryId = repositoryId;
-                            this.issueRepository.save(gIssue);
+                const repositories = val.data.data.user.repositories.edges;
+                if(repositories && repositories.length > 0){
+                    for(let repository of repositories){
+                        const issues = repository.node.issues.edges;
+                        const repositoryId = repository.node.databaseId;
+                        if(issues && issues.length > 0){
+                            for(let issue of issues){
+                                const gIssue: IssueDTO = this.getIssueNode(issue.node);
+                                if(gIssue){
+                                    gIssue.repositoryId = repositoryId;
+                                    this.issueRepository.save(gIssue);
+                                }
+                            }
                         }
                     }
                 }

@@ -1,7 +1,7 @@
 export const httpOptions = {
     headers: {
       "Content-Type": "application/json",
-      "Authorization": "Bearer 4abfc422dc907d9676ce81d890d8e8e22c0ed163",
+      "Authorization": "Bearer 7cea30226e86de4fbf69d118eacc3c4be44d2f36",
       //"Authorization": process.env.GIT_PERSONAL_TOKEN
     },
 };
