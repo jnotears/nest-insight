@@ -1,6 +1,7 @@
 # compiled output
 /dist
 /node_modules
+/helper/http-helper.ts
 
 # Logs
 logs

@@ -2,7 +2,7 @@ import { Injectable, HttpService } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { AxiosResponse } from 'axios';
 import { gitGraphqlApiUrl, httpOptions } from '../helper/http-helper';
-import { Converter } from '../helper/converter'
+import { Converter } from 'src/helper/converter';
 
 @Injectable()
 export class IssueService {
@@ -29,7 +29,7 @@ export class IssueService {
                 }
             }
         }`;
-        const query = {"query": graph};
+        const query = {"query": this.converter.stringToGraphQl(graph)};
         return this.http.post<any>(gitGraphqlApiUrl, query, httpOptions);
     }
     getIssue(owner: string,repositoryName: string, number: number): Observable<AxiosResponse<any>> {
@@ -46,7 +46,7 @@ export class IssueService {
                 }
             }
         }`;
-        const query = {"query": graph};
+        const query = {"query": this.converter.stringToGraphQl(graph)};
         return this.http.post<any>(gitGraphqlApiUrl, query, httpOptions);
     }
 }

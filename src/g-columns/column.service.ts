@@ -1,8 +1,8 @@
 import { Injectable, HttpService } from '@nestjs/common';
-import { Converter } from '../helper/converter';
 import { gitGraphqlApiUrl, httpOptions } from '../helper/http-helper';
 import { Observable } from 'rxjs';
 import { AxiosResponse } from 'axios';
+import { Converter } from 'src/helper/converter';
 
 @Injectable()
 export class ColumnService {
@@ -32,7 +32,7 @@ export class ColumnService {
                     }
                 }
             }`;
-        const query = { "query": graph };
+        const query = { "query": this.converter.stringToGraphQl(graph) };
         return this.http.post<any>(gitGraphqlApiUrl, query, httpOptions);
     }
 }
