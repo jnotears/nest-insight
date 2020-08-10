@@ -51,7 +51,7 @@ export class IssueService {
         return issue;
     }
 
-    fillData(owner: string, repositoryName: string): boolean{
+    fillData(owner: string, repositoryName: string){
         this.getIssues(owner,repositoryName).subscribe(
             val => {
                 const issues = val.data.data.repository.issues.edges;
@@ -62,13 +62,10 @@ export class IssueService {
                         if(gIssue){
                             gIssue.repositoryId = repositoryId;
                             this.issueRepository.save(gIssue);
-                        }else{
-                            return false;
                         }
                     }
                 }
             }
         )
-        return true;
     }
 }

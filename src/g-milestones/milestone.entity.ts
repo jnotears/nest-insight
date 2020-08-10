@@ -1,7 +1,7 @@
-import {Entity, PrimaryGeneratedColumn, Column} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
 @Entity()
-export class Milestone{
+export class GMilestone {
     @PrimaryGeneratedColumn()
     id: number;
 
@@ -12,5 +12,20 @@ export class Milestone{
     title: string;
 
     @Column()
-    dueOn: number;
+    creator: string;
+
+    @Column()
+    dueOn: Date;
+
+    @Column()
+    createdAt: Date;
+
+    @Column({ nullable: true })
+    closedAt: Date;
+
+    @Column()
+    state: string;
+
+    @Column()
+    repositoryId: number;
 }

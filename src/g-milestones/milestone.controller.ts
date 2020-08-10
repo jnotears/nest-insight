@@ -10,6 +10,6 @@ export class MilestoneController {
 
     @Get()
     getMilestone() {
-        this.mile.getMilestones("jnotears", "angular-shopping-app").subscribe(val => console.log(val));
+        this.mile.fillData("jnotears");
     }
 }

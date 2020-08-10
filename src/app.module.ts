@@ -26,7 +26,7 @@ import { RepositoryModule } from './g-repositories/repository.module';
       database: 'git-etop-x',
       entities: entities,
       synchronize: true,
-    })
+    }),
   ],
   controllers: [AppController],
   providers: [
