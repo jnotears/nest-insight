@@ -8,9 +8,9 @@ export class ColumnController {
         private readonly col: ColumnService
     ) { }
 
+    ///for testing
     @Get()
     getColumns() {
         this.col.fillData("jnotears", "angular-shopping-app");
-        //this.col.getColumns("jnotears", "angular-shopping-app").subscribe(val => console.log(JSON.stringify(val.data, null, 2)));
     }
 }

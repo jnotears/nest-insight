@@ -1,8 +1,8 @@
-import {Column, Entity, PrimaryGeneratedColumn} from 'typeorm';
+import {Column, Entity, PrimaryColumn} from 'typeorm';
 
 @Entity()
 export class Issue{
-    @PrimaryGeneratedColumn()
+    @PrimaryColumn()
     id: number;
 
     @Column()
@@ -14,8 +14,8 @@ export class Issue{
     @Column()
     content: string;
 
-    @Column()
-    estimate: number;
+    @Column({nullable: true})
+    estimate: Date;
 
     @Column()
     repositoryId: number;
