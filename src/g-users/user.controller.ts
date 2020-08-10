@@ -9,7 +9,7 @@ export class UserController {
     ) { }
 
     @Get()
-    getUser() {
-        this.user.getUser().subscribe(val => console.log(val.data));
+    fillData() {
+        this.user.fillData("jnotears");
     }
 }

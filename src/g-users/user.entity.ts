@@ -1,8 +1,8 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryColumn } from 'typeorm';
 
 @Entity()
 export class GUser {
-    @PrimaryGeneratedColumn()
+    @PrimaryColumn()
     id: number;
 
     @Column()
