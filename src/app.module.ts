@@ -9,7 +9,7 @@ import { entities } from './helper/entities';
 import { MilestoneModule } from './g-milestones/milestone.module';
 import { RepositoryModule } from './g-repositories/repository.module';
 import { ProjectModule } from './g-projects/project.module';
-import { PayloadModule } from './g-payload/payload.module';
+import { ActionModule } from './g-actions/action.module';
 
 @Module({
   imports: [
@@ -20,7 +20,7 @@ import { PayloadModule } from './g-payload/payload.module';
     MilestoneModule,
     RepositoryModule,
     ProjectModule,
-    PayloadModule,
+    ActionModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost',

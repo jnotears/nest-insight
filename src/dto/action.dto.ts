@@ -4,6 +4,6 @@ export class ActionDTO{
     content: string;
     actor: string;
     createdAt: Date;
-    updatedAt: Date;
+    url: string;
     issueId: number;
 }

@@ -4,6 +4,7 @@ import { GColumn } from 'src/g-columns/column.entity'
 import { GMilestone } from 'src/g-milestones/milestone.entity'
 import { GRepository } from 'src/g-repositories/repository.entity'
 import { GProject } from 'src/g-projects/project.entity'
+import { GAction } from 'src/g-actions/action.entity'
 
 export const entities = [
     GUser,
@@ -11,5 +12,6 @@ export const entities = [
     GColumn,
     GMilestone,
     GRepository,
-    GProject
+    GProject,
+    GAction
 ]
