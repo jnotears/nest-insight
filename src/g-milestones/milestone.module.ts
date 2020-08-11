@@ -1,5 +1,5 @@
 import {Module, HttpModule} from '@nestjs/common';
-import { MilestoneService } from './milestone.sevice';
+import { MilestoneService } from './milestone.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GMilestone } from './milestone.entity';
 import { MilestoneController } from './milestone.controller';
