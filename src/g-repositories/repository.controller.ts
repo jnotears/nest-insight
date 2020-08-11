@@ -1,15 +1,15 @@
-import {Controller, Get} from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { RepositoryService } from './repository.service';
 
 @Controller('repository')
-export class RepositoryController{
+export class RepositoryController {
 
     constructor(
         private readonly repoService: RepositoryService
-    ){}
+    ) { }
 
     @Get()
-    fillData(){
+    fillData() {
         this.repoService.fillData("jnotears");
     }
 }

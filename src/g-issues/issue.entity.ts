@@ -14,6 +14,9 @@ export class GIssue{
     @Column()
     content: string;
 
+    @Column()
+    url: string;
+
     @Column({nullable: true})
     estimate: Date;
 

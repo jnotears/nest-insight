@@ -53,6 +53,7 @@ export class IssueService {
         issue.issueNumber = node["number"];
         issue.name = node["title"];
         issue.content = node["body"];
+        issue.url = node["url"];
         issue.author = node["author"].login;
         return issue;
     }
