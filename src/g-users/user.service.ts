@@ -17,6 +17,16 @@ export class UserService {
         @InjectRepository(GUser) private readonly userRepository: Repository<GUser>
     ) { }
 
+    getUsername(): Observable<AxiosResponse<any>> {
+        const graph = `{
+            viewer{
+                login
+            }
+        }`;
+        const query = { "query": this.converter.stringToGraphQl(graph) };
+        return this.http.post<any>(gitGraphqlApiUrl, query, httpOptions);
+    }
+
     getUser(username: string): Observable<AxiosResponse<any>> {
         const graph = `{
             user(login: "${username}"){
@@ -25,7 +35,7 @@ export class UserService {
             }
         }`;
         const query = { "query": this.converter.stringToGraphQl(graph) };
-        return this.http.post<any>(gitGraphqlApiUrl, query, httpOptions)
+        return this.http.post<any>(gitGraphqlApiUrl, query, httpOptions);
     }
 
     fillData(username: string) {
