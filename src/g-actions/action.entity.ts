@@ -7,7 +7,7 @@ export class GAction{
     id: number;
 
     @Column()
-    type: string;
+    act: string;
 
     @Column()
     content: string;
@@ -15,12 +15,24 @@ export class GAction{
     @Column()
     actor: string;
 
-    @Column()
+    @Column({nullable: true})
     createdAt: Date;
 
-    @Column()
-    url: string;
+    @Column({nullable: true})
+    updatedAt: Date;
 
-    @Column()
-    issueId: number;
+    @Column({nullable: true})
+    closedAt: Date;
+
+    @Column({nullable: true})
+    actionUrl: string;
+
+    @Column({nullable:true})
+    event: string;
+
+    @Column({nullable: true})
+    fromLocation: number;
+
+    @Column({nullable: true})
+    toLocation: number;
 }

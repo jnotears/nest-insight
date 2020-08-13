@@ -10,6 +10,7 @@ import { MilestoneModule } from './g-milestones/milestone.module';
 import { RepositoryModule } from './g-repositories/repository.module';
 import { ProjectModule } from './g-projects/project.module';
 import { ActionModule } from './g-actions/action.module';
+import { HOST_NAME, DATABASE_NAME } from './helper/config';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { ActionModule } from './g-actions/action.module';
     ActionModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
+      host: HOST_NAME,
       port: 5432,
       username: 'postgres',
       password: '123456',
@@ -33,8 +34,6 @@ import { ActionModule } from './g-actions/action.module';
     }),
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-  ],
+  providers: [AppService],
 })
 export class AppModule { }

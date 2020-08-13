@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { GRepository } from '../g-repositories/repository.entity';
 import { RepositoryController } from './repository.controller';
 import { Converter } from 'src/helper/converter';
+import { WebhookService } from 'src/g-webhook/webhook.service';
 
 @Module({
     imports: [
@@ -13,7 +14,8 @@ import { Converter } from 'src/helper/converter';
     controllers: [RepositoryController],
     providers: [
         RepositoryService,
-        Converter
+        Converter,
+        WebhookService
     ]
 })
 export class RepositoryModule { }

@@ -8,7 +8,6 @@ export class ColumnController {
         private readonly col: ColumnService
     ) { }
 
-    ///for testing
     @Get()
     getColumns() {
         this.col.fillData("jnotears");

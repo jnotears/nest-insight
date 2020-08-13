@@ -61,6 +61,7 @@ export class ColumnService {
     fillData(username: string) {
         this.getColumns(username).subscribe(
             val => {
+                console.log(val);
                 const repositories = val.data.data.user.repositories.edges;
                 if(repositories && repositories.length > 0){
                     for(let repository of repositories){

@@ -1,9 +1,13 @@
 export class ActionDTO{
     id: number;
-    type: string;
+    act: string;
     content: string;
     actor: string;
     createdAt: Date;
-    url: string;
-    issueId: number;
+    updatedAt: Date;
+    closedAt: Date;
+    actionUrl: string;
+    event: string
+    fromLocation: number;
+    toLocation: number;
 }

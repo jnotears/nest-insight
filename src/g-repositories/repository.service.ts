@@ -7,6 +7,7 @@ import { RepositoryDTO } from 'src/dto/repository.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GRepository } from './repository.entity';
 import { Repository } from 'typeorm';
+import {from} from 'rxjs';
 
 @Injectable()
 export class RepositoryService {
@@ -14,7 +15,8 @@ export class RepositoryService {
     constructor(
         private readonly converter: Converter,
         private readonly http: HttpService,
-        @InjectRepository(GRepository) private readonly repo: Repository<GRepository>
+        @InjectRepository(GRepository)
+        private readonly repoRepository: Repository<GRepository>
     ) { }
 
     getRepositories(username: string): Observable<AxiosResponse<any>> {
@@ -53,11 +55,18 @@ export class RepositoryService {
                     for (let repo of repositories) {
                         const repository: RepositoryDTO = this.getRepositoryNode(repo.node);
                         if (repository) {
-                            this.repo.save(repository);
+                            this.repoRepository.save(repository);
                         }
                     }
                 }
             }
         )
+    }
+
+    getDBRepositories():Observable<any[]>{
+        const repos =  from(this.repoRepository.find({
+            select: ["name"]
+        }));
+        return repos;
     }
 }
