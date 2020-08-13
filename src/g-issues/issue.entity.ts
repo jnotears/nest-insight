@@ -9,6 +9,9 @@ export class GIssue{
     issueNumber: number;
 
     @Column()
+    name: string;
+
+    @Column()
     author: string;
 
     @Column()

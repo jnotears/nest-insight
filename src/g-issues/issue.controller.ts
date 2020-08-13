@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Post, Req } from '@nestjs/common';
 import { IssueService } from './issue.service';
 
 @Controller('issue')
@@ -10,7 +10,11 @@ export class IssueController {
 
     @Get()
     getIssues() {
-        //this.issue.getIssues("jnotears","angular-shopping-app").subscribe(val => console.log(JSON.stringify(val.data,null,2)));
         this.issue.fillData("jnotears");
+    }
+
+    @Post()
+    listenRequest(@Req() req){
+        this.issue.listenIssue(req.body);
     }
 }

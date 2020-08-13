@@ -80,4 +80,30 @@ export class IssueService {
             }
         )
     }
+
+    listenIssue(data){
+        if(data.action == 'opened'){
+            const issueDto: IssueDTO = {
+                id: data.issue.id,
+                issueNumber: data.issue.number,
+                name: data.issue.title,
+                author: data.issue.user.login,
+                content: data.issue.body,
+                url: data.issue.url,
+                estimate: null,
+                repositoryId: data.repository.id,
+            }
+            if(issueDto){
+                this.issueRepository.save(issueDto);
+            }
+        }
+
+        if(data.action == 'edited'){
+            const newIssue = {
+                name: data.issue.title,
+                content: data.issue.body,
+            }
+            this.issueRepository.update(data.issue.id, newIssue);
+        }
+    }
 }
