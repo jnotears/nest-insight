@@ -11,29 +11,40 @@ import { RepositoryModule } from './g-repositories/repository.module';
 import { ProjectModule } from './g-projects/project.module';
 import { ActionModule } from './g-actions/action.module';
 import { HOST_NAME, DATABASE_NAME } from './helper/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { GithubModule } from './github/github.module';
 
 @Module({
   imports: [
     HttpModule,
-    UserModule,
-    IssueModule,
-    ColumnModule,
-    MilestoneModule,
-    RepositoryModule,
-    ProjectModule,
-    ActionModule,
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: HOST_NAME,
-      port: 5432,
-      username: 'postgres',
-      password: '123456',
-      database: 'git-etop-x',
-      entities: entities,
-      synchronize: true,
+    // UserModule,
+    // IssueModule,
+    // ColumnModule,
+    // MilestoneModule,
+    // RepositoryModule,
+    // ProjectModule,
+    // ActionModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
     }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService): any => ({
+        type: 'postgres',
+        host: configService.get<string>('DATABASE_HOST'),
+        port: configService.get<number>('DATABASE_PORT'),
+        username: configService.get<string>('DATABASE_USERNAME'),
+        password: configService.get<string>('DATABASE_PASSWORD'),
+        database: configService.get<string>('DATABASE_NAME'),
+        entities: [].concat(GithubModule.entities()),
+        synchronize: true,
+      }),
+      inject: [ConfigService],
+    }),
+
+    GithubModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
