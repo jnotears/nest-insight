@@ -16,11 +16,15 @@ export class RepositoryEntity extends EntityBase {
   @Column()
   external_id: string;
 
+  @Column()
+  owner: string;
+
   static from(data: GitRepositoryAPIResponse): RepositoryEntity {
     return {
       ...new RepositoryEntity(),
       name: data.name,
       external_id: data.repo_id,
+      owner: data.owner,
     };
   }
 }
