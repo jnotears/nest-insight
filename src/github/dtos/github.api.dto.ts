@@ -2,46 +2,55 @@ export interface GithubProfileAPIResponse {
     username: string;
     name: string;
     email: string;
+    avatar_url: string
+}
+
+export interface ProfileResponse{
+    name: string;
+    email: string;
+    avatar_url: string
 }
 
 export interface GitRepositoryAPIResponse {
-    repo_id: string;
+    external_id: string;
     name: string;
     owner: string;
-}
-
-export interface GitIssueAPIResponse {
-    external_id: number;
-    number: number;
-    name: string;
-    author: string;
-    content: string;
-    url: string;
-    mile_node_id: number;
-    repo_id: number;
-    state: string;
-}
-
-export interface GitLabelAPIResponse {
-    name: string;
-    node_id: string;
-    url: string;
-    color: string;
-    description: string;
-    repo_id: number
 }
 
 export interface GitProjectAPIResponse {
     external_id: number;
     number: number
     name: string;
-    content: string;
+    description: string;
     state: string;
-    repo_id: number;
+    closed_at?: Date;
+}
+
+export interface GitIssueAPIResponse{
+    external_id: number;
+    number: number;
+    name: string;
+    author: string;
+    content: string;
+    url: string;
+    state: string;
+    closed_at?: Date;
+}
+
+export interface GitColumnAPIResponse {
+    external_id: number;
+    name: string;
+    url: string;
+}
+
+export interface GitCommentAPIResponse {
+    external_id: number;
+    author: string;
+    content: string;
+    url: string;
 }
 
 export interface GitMilestoneAPIResponse {
-    node_id: string;
     name: string;
     url: string;
     state: string;
@@ -49,19 +58,20 @@ export interface GitMilestoneAPIResponse {
     creator: string;
     due_on: Date;
     closed_at: Date;
-    repo_id: number;
+    description: string;
 }
 
-export interface GitColumnAPIResponse {
+export interface GitLabelAPIResponse {
     name: string;
+    color: string;
+    description: string;
     url: string;
-    external_id: number;
-    external_proj_id: number;
 }
 
-export interface GitCommentAPIResponse {
-    external_id: number;
-    external_issue_id: number;
-    author: string;
-    content: string;
+export interface GitIssueColumnAPIResponse{
+    col_external_id: number;
+    proj_external_id: number;
 }
+
+
+

@@ -16,8 +16,11 @@ export class User extends EntityBase {
   @Column()
   email: string;
 
-  @Column()
+  @Column({nullable: true})
   external_token: string;
+
+  @Column()
+  avatar_url: string;
 
   static from(data: GithubProfileAPIResponse): User {
       return Object.assign(new User(), data);

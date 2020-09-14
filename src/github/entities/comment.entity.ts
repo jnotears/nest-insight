@@ -11,7 +11,7 @@ export class CommentEntity extends EntityBase{
     external_id: number;
 
     @Column()
-    external_issue_id: number;
+    issue_id: number;
 
     @Column()
     author: string;
@@ -19,13 +19,16 @@ export class CommentEntity extends EntityBase{
     @Column()
     content: string;
 
+    @Column()
+    url: string;
+
     static from(data: GitCommentAPIResponse): CommentEntity{
       return {
         ...new CommentEntity(),
         external_id: data.external_id,
         content: data.content,
         author: data.author,
-        external_issue_id: data.external_issue_id,
+        url: data.url
       }
     }
 }

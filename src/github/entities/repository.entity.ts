@@ -16,6 +16,9 @@ export class RepositoryEntity extends EntityBase {
   @Column()
   external_id: string;
 
+  @Column({default: false})
+  sync: boolean;
+
   @Column()
   owner: string;
 
@@ -23,8 +26,8 @@ export class RepositoryEntity extends EntityBase {
     return {
       ...new RepositoryEntity(),
       name: data.name,
-      external_id: data.repo_id,
-      owner: data.owner,
+      external_id: data.external_id,
+      owner: data.owner
     };
   }
 }
