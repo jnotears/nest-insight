@@ -1,12 +1,15 @@
 import { EntityBase } from 'src/shared/base/entity.base';
-import { Column, Entity, PrimaryColumn } from 'typeorm';
-import { extname } from 'path';
+import { Entity, PrimaryColumn, Column } from 'typeorm';
 
 @Entity()
 export class IssueColumnEntity extends EntityBase{
     @PrimaryColumn()
-    external_issue_id: number;
+    issue_id: number;
 
     @PrimaryColumn()
-    external_col_id: number;
+    proj_id: number;
+
+    @Column()
+    col_id: number;
+
 }

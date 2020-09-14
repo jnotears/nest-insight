@@ -1,13 +1,12 @@
+import { EntityBase } from 'src/shared/base/entity.base';
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 @Entity()
-export class GIssueAssignee{
+export class Assignee extends EntityBase{
     @PrimaryColumn()
     issue_id: number;
 
     @PrimaryColumn()
-    user_id: number;
+    user_id: string;
 
-    @Column()
-    createdAt: Date;
 }

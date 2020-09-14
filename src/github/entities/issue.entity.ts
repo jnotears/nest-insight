@@ -28,11 +28,11 @@ export class IssueEntity extends EntityBase{
     @Column()
     url: string;
 
-    @Column({nullable: true})
-    mile_id: number;
-
     @Column()
     repo_id: number;
+
+    @Column({nullable: true})
+    closed_at: Date;
 
     static from(data: GitIssueAPIResponse): IssueEntity{
       return {
@@ -41,10 +41,10 @@ export class IssueEntity extends EntityBase{
         name: data.name,
         content: data.content,
         number: data.number,
-        repo_id: data.repo_id,
         author: data.author,
         url: data.url,
         state: data.state,
+        closed_at: data.closed_at ? data.closed_at : null
       }
     }
 }

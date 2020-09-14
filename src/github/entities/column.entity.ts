@@ -1,5 +1,6 @@
 import { EntityBase } from 'src/shared/base/entity.base';
 import { Entity, Column, PrimaryGeneratedColumn, PrimaryColumn } from 'typeorm';
+import { GitColumnAPIResponse } from '../dtos/github.api.dto';
 
 @Entity()
 export class ColumnEntity extends EntityBase {
@@ -16,5 +17,14 @@ export class ColumnEntity extends EntityBase {
     url: string;
 
     @Column()
-    external_proj_id: number;
+    proj_id: number;
+
+    static from(data: GitColumnAPIResponse): ColumnEntity{
+        return {
+            ...new ColumnEntity(),
+            external_id: data.external_id,
+            name: data.name,
+            url: data.url
+        }
+    }
 }

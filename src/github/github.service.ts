@@ -1,846 +1,541 @@
-import { from } from 'rxjs';
-import { CommentEntity } from './entities/comment.entity';
-import { IssueAssigneeEntity } from './entities/issueassignee.entity';
-import { IssueColumnEntity } from './entities/issuecolumn.entity';
-import { IssueLabelEntity } from './entities/issuelabel.entity';
-import { ColumnEntity } from './entities/column.entity';
-import { MilestoneEntity } from './entities/milestone.entity';
-import { ProjectEntity } from './entities/project.entity';
-import { LabelEntity } from './entities/label.entity';
-import { IssueEntity } from './entities/issue.entity';
-import { Injectable, HttpService } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { GithubApi } from "./github.api";
 import { User } from "./entities/user.entity";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { RepositoryEntity } from "./entities/repository.entity";
-import { JwtService } from '@nestjs/jwt';
+import { JwtService } from "@nestjs/jwt";
+import { ProfileResponse, GitRepositoryAPIResponse, GitIssueAPIResponse, 
+GitProjectAPIResponse, GitColumnAPIResponse, GitCommentAPIResponse, 
+GitMilestoneAPIResponse, GithubProfileAPIResponse, GitLabelAPIResponse, 
+GitIssueColumnAPIResponse } from "./dtos/github.api.dto";
+import { ProjectEntity } from "./entities/project.entity";
+import { IssueEntity } from "./entities/issue.entity";
+import { ColumnEntity } from "./entities/column.entity";
+import { CommentEntity } from "./entities/comment.entity";
+import { MilestoneEntity } from "./entities/milestone.entity";
+import { Assignee } from "./entities/assignee.entity";
+import { Hook } from "./entities/hook.entity";
+import { LabelEntity } from "./entities/label.entity";
+import { IssueColumnEntity } from "./entities/issue.column.entity";
+import { AssigneeResponse, RepositoryExtendedResponse } from './dtos/github.ctrl.dto';
 
 @Injectable()
 export class GithubService {
-    constructor(
-        @InjectRepository(User) private userRepo: Repository<User>,
-        @InjectRepository(RepositoryEntity) private repoRepo: Repository<RepositoryEntity>,
-        @InjectRepository(IssueEntity) private issueRepo: Repository<IssueEntity>,
-        @InjectRepository(LabelEntity) private labelRepo: Repository<LabelEntity>,
-        @InjectRepository(ProjectEntity) private projRepo: Repository<ProjectEntity>,
-        @InjectRepository(MilestoneEntity) private mileRepo: Repository<MilestoneEntity>,
-        @InjectRepository(ColumnEntity) private colRepo: Repository<ColumnEntity>,
-        @InjectRepository(IssueLabelEntity) private isslabRepo: Repository<IssueLabelEntity>,
-        @InjectRepository(IssueColumnEntity) private isscolRepo: Repository<IssueColumnEntity>,
-        @InjectRepository(IssueAssigneeEntity) private issassRepo: Repository<IssueAssigneeEntity>,
-        @InjectRepository(CommentEntity) private commentRepo: Repository<CommentEntity>,
-        private http: HttpService,
-        private jwtService: JwtService,
-        private githubApi: GithubApi,
-    ) { }
+  constructor(
+    @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(RepositoryEntity) private repoRepo: Repository<RepositoryEntity>,
+    @InjectRepository(ProjectEntity) private projRepo: Repository<ProjectEntity>,
+    @InjectRepository(IssueEntity) private issueRepo: Repository<IssueEntity>,
+    @InjectRepository(ColumnEntity) private columnRepo: Repository<ColumnEntity>,
+    @InjectRepository(CommentEntity) private commentRepo: Repository<CommentEntity>,
+    @InjectRepository(MilestoneEntity) private milestoneRepo: Repository<MilestoneEntity>,
+    @InjectRepository(Assignee) private assigneeRepo: Repository<Assignee>,
+    @InjectRepository(Hook) private hookRepo: Repository<Hook>,
+    @InjectRepository(LabelEntity) private labelRepo: Repository<LabelEntity>,
+    @InjectRepository(IssueColumnEntity) private issueColumnRepo: Repository<IssueColumnEntity>,
 
-    async login(token: string): Promise<object> {
-        const profile = await this.githubApi.getUsername(token);
-        let user = await this.userRepo.findOne({
-            where: {
-                username: profile.username,
-            },
-        });
-        if (!user) {
-            user = User.from(profile);
-        }
+    private githubApi: GithubApi,
+    private jwtService: JwtService
+  ) { }
 
-        user.external_token = token;
+  getGithubAccessToken(code: string): Promise<object> {
+    return this.githubApi.getGithubToken(code);
+  }
 
-        await this.userRepo.save(user);
-
-        this.fetchReposity(user);
-
-        const payload = { sub: user.id, username: user.username };
-        console.log('jwt token', this.jwtService.sign(payload));
-        return {
-            access_token: this.jwtService.sign(payload),
-            username: user.username
-        };
+  async login(token: string): Promise<{ access_token; username }> {
+    const profile = await this.githubApi.getUser(token);
+    let user = await this.userRepo.findOne({
+      where: {
+        username: profile.username,
+      },
+    });
+    if (!user) {
+      user = User.from(profile);
     }
 
-    createParams(code: string) {
-        return {
-            client_id: "3c59aac014defea85b10",
-            client_secret: "d4dd7d63fa7653d65c02fb5371ffa6a2aad31ecf",
-            code: code
-        }
+    user.external_token = token;
+    await this.userRepo.save(user);
+
+    this.fetchRepositories(user.external_token, user.id, user.username);
+
+    const payload = { sub: user.id, username: user.username };
+    return {
+      access_token: this.jwtService.sign(payload),
+      username: user.username
+    };
+  }
+
+  async findUserByUsername(username: string): Promise<User> {
+    return this.userRepo.findOne({
+      where: {
+        username: username
+      }
+    })
+  }
+
+  async fetchUser(token: string, username: string): Promise<User> {
+    const gUser = await this.githubApi.getUser(token, username);
+    if (gUser) {
+      await this.createOrUpdateUser(User.from(gUser));
     }
+    return this.findUserByUsername(username);
+  }
 
-    getGithubAccessToken(code: string): Promise<object> {
-        return this.http.post<object>(
-            'https://github.com/login/oauth/access_token',
-            this.createParams(code),
-            {
-                headers: {
-                    "accept": "application/json",
-                },
-            }
-        ).toPromise()
-            .then(val => val.data);
+  async remapDbUsers(users: User[]): Promise<User[]> {
+    const dbUsers = await this.userRepo.find();
+    users.forEach(user => {
+      const dbUser = dbUsers.find(i => i.username == user.username);
+      if (dbUser) {
+        user.id = dbUser.id;
+      }
+    })
+    return users;
+  }
+
+  private async createOrUpdateUsers(datas: GithubProfileAPIResponse[]): Promise<User[]> {
+    let users = datas.map(user => ({
+      ...new User(),
+      ...user
+    }));
+    users = await this.remapDbUsers(users);
+    return await this.userRepo.save(users);
+  }
+
+  private async createOrUpdateUser(user: User): Promise<User> {
+    let dbUser = await this.userRepo.findOne({
+      where: { username: user.username }
+    })
+    if (!dbUser) {
+      dbUser = {
+        ...new User(),
+        ...user
+      };
     }
+    Object.assign(dbUser, user);
+    return await this.userRepo.save(dbUser);
+  }
 
-    async fetchReposity(user: User) {
-        const repos = await this.githubApi.getRepositories(
-            user.username,
-            user.external_token,
-        );
-        const repoEntities = repos.map(repo => ({
-            ...RepositoryEntity.from(repo),
-            user_id: user.id,
-        }));
+  async remapDbRepositories(repositoryEntities: RepositoryEntity[]): Promise<RepositoryEntity[]> {
+    const dbRepos = await this.repoRepo.find();
+    repositoryEntities.forEach(repo => {
+      const dbRepo = dbRepos.find(i => i.external_id == repo.external_id && i.user_id == repo.user_id);
+      if (dbRepo) {
+        repo.id = dbRepo.id;
+      }
+    })
+    return repositoryEntities;
+  }
 
-        repoEntities.map(repo => {
-            this.repoRepo.findOne({
-                where: { external_id: repo.external_id }
-            }).then(data => {
-                if (!data) {
-                    this.repoRepo.save(repo);
-                }
-            })
-        })
+  private async createOrUpdateRepositories(user_id: string, datas: GitRepositoryAPIResponse[]): Promise<RepositoryEntity[]> {
+    let repositoryEntities = datas.map(repo => ({
+      ...RepositoryEntity.from(repo),
+      user_id: user_id
+    }));
+    repositoryEntities = await this.remapDbRepositories(repositoryEntities);
+    return await this.repoRepo.save(repositoryEntities);
+  }
+
+  async fetchRepositories(token: string, user_id: string, username: string): Promise<RepositoryEntity[]> {
+    const allRepositories = await this.githubApi.getAllRepositories(token, username);
+    return await this.createOrUpdateRepositories(user_id, allRepositories);
+  }
+
+  async fetchProjects(token: string, repo_id: number, repo_name: string, repo_owner: string): Promise<ProjectEntity[]> {
+    const allProjetcs = await this.githubApi.getAllProjects(token, repo_name, repo_owner);
+    return await this.createOrUpdateProjects(repo_id, allProjetcs);
+  }
+
+  private async createOrUpdateProjects(repo_id: number, datas: GitProjectAPIResponse[]): Promise<ProjectEntity[]> {
+    let projectEntities = datas.map(proj => ({
+      ...ProjectEntity.from(proj),
+      repo_id: repo_id
+    }));
+    projectEntities = await this.remapDbProjects(projectEntities);
+    return await this.projRepo.save(projectEntities);
+  }
+
+  async remapDbProjects(projectEntities: ProjectEntity[]): Promise<ProjectEntity[]> {
+    const dbProjects = await this.projRepo.find();
+    projectEntities.forEach(proj => {
+      const dbProject = dbProjects.find(i => i.external_id == proj.external_id && i.repo_id == proj.repo_id);
+      if (dbProject) {
+        proj.id = dbProject.id;
+      }
+    })
+    return projectEntities;
+  }
+
+  async createOrUpdateIssue(Issue: IssueEntity) {
+
+  }
+
+  // get all raw data <= github api
+  // convert data 
+  // save data to database
+  async fetchIssues(token: string, repo_id: number, repo_name: string, repo_owner: string): Promise<IssueEntity[]> {
+    const allIssue = await this.githubApi.getAllIssues(token, repo_name, repo_owner);
+    return await this.createOrUpdateIssues(repo_id, allIssue);
+  }
+
+  async fetchIssue(token, repo_id, repo_name, issue_id): Promise<IssueEntity[]> {
+    const issue: GitIssueAPIResponse = await this.githubApi.getIssueById(token, issue_id);
+    return await this.createOrUpdateIssues(repo_id, [issue]);
+  }
+
+  private async createOrUpdateIssues(repo_id: number, datas: Array<GitIssueAPIResponse>): Promise<IssueEntity[]> {
+    let issueEntities = datas.map(issue => ({
+      ...IssueEntity.from(issue),
+      repo_id: repo_id
+    }));
+    issueEntities = await this.remapDbIssues(issueEntities);
+    return await this.issueRepo.save(issueEntities);
+  }
+
+  async remapDbIssues(issueEntities: IssueEntity[]): Promise<IssueEntity[]> {
+    const dbIssues = await this.issueRepo.find();
+    issueEntities.forEach(issue => {
+      const dbIssue = dbIssues.find(i => i.external_id == issue.external_id && i.repo_id == issue.repo_id);
+      if (dbIssue) {
+        issue.id = dbIssue.id;
+      }
+    })
+    return issueEntities;
+  }
+
+  async fetchColumns(token: string, repo_name: string, repo_owner, proj_id: number, proj_number: number): Promise<ColumnEntity[]> {
+    const allColumns = await this.githubApi.getAllColumns(token, repo_name, repo_owner, proj_number);
+    return await this.createOrUpdateColumns(proj_id, allColumns);
+  }
+
+  async remapDbColumns(columnEntities: ColumnEntity[]): Promise<ColumnEntity[]> {
+    const dbColumns = await this.columnRepo.find();
+    columnEntities.forEach(col => {
+      const dbCol = dbColumns.find(i => i.external_id == col.external_id && i.proj_id == col.proj_id);
+      if (dbCol) {
+        col.id = dbCol.id;
+      }
+    })
+    return columnEntities;
+  }
+
+  private async createOrUpdateColumns(proj_id: number, datas: GitColumnAPIResponse[]): Promise<ColumnEntity[]> {
+    let columnEntities = datas.map(col => ({
+      ...ColumnEntity.from(col),
+      proj_id: proj_id
+    }));
+    columnEntities = await this.remapDbColumns(columnEntities);
+    return await this.columnRepo.save(columnEntities);
+  }
+
+  async fetchComments(token: string, repo_name: string, repo_owner, issue_id: number, issue_number: number): Promise<CommentEntity[]> {
+    const allComments = await this.githubApi.getAllComments(token, repo_name, repo_owner, issue_number);
+    return await this.createOrUpdateComments(issue_id, allComments);
+  }
+
+  async remapDbComments(commentEntities: CommentEntity[]): Promise<CommentEntity[]> {
+    const dbCmts = await this.commentRepo.find();
+    commentEntities.forEach(cmt => {
+      const dbCmt = dbCmts.find(i => i.external_id == cmt.external_id && i.issue_id == cmt.issue_id);
+      if (dbCmt) {
+        cmt.id = dbCmt.id;
+      }
+    })
+    return commentEntities;
+  }
+
+  private async createOrUpdateComments(issue_id: number, datas: GitCommentAPIResponse[]): Promise<CommentEntity[]> {
+    let commentEntities = datas.map(cmt => ({
+      ...CommentEntity.from(cmt),
+      issue_id: issue_id
+    }));
+    commentEntities = await this.remapDbComments(commentEntities);
+    return await this.commentRepo.save(commentEntities);
+  }
+
+  async fetchMilestones(token: string, repo_name: string, repo_owner, repo_id: number,): Promise<MilestoneEntity[]> {
+    const allMilestones = await this.githubApi.getAllMilestones(token, repo_name, repo_owner);
+    return await this.createOrUpdateMilestones(repo_id, allMilestones);
+  }
+
+  async remapDbMilestones(milestoneEntities: MilestoneEntity[]): Promise<MilestoneEntity[]> {
+    const dbMilestones = await this.milestoneRepo.find();
+    milestoneEntities.forEach(mile => {
+      const dbMilestone = dbMilestones.find(i => i.repo_id == mile.repo_id && i.name == mile.name);
+      if (dbMilestone) {
+        mile.id = dbMilestone.id;
+      }
+    })
+    return milestoneEntities;
+  }
+
+  private async createOrUpdateMilestones(repo_id: number, datas: GitMilestoneAPIResponse[]): Promise<MilestoneEntity[]> {
+    let milestoneEntities: MilestoneEntity[] = datas.map(mile => ({
+      ...MilestoneEntity.from(mile),
+      repo_id: repo_id
+    }));
+    milestoneEntities = await this.remapDbMilestones(milestoneEntities);
+    return await this.milestoneRepo.save(milestoneEntities);
+  }
+
+  async fetchAssignees(token: string, repo_name: string, repo_owner, issue_id: number, issue_number: number,): Promise<User[]> {
+    const allAssignees = await this.githubApi.getAllAssignees(token, repo_name, repo_owner, issue_number);
+    return await this.createOrUpdateAssignees(issue_id, allAssignees);
+  }
+
+  private async createOrUpdateAssignees(issue_id: number, datas: GithubProfileAPIResponse[]): Promise<User[]> {
+    const users = await this.createOrUpdateUsers(datas);
+    let assignees: Assignee[] = users.map(user => ({
+      ...new Assignee(),
+      user_id: user.id,
+      issue_id: issue_id
+    }));
+    await this.assigneeRepo.save(assignees);
+    return users;
+  }
+
+  async fetchLabels(token: string, repo_name: string, repo_owner, repo_id: number): Promise<LabelEntity[]> {
+    const allLabels = await this.githubApi.getAllLabels(token, repo_name, repo_owner);
+    return await this.createOrUpdateLabels(repo_id, allLabels);
+  }
+
+  async remapDbLabels(labelEntities: LabelEntity[]): Promise<LabelEntity[]> {
+    const dbLabels = await this.labelRepo.find();
+    labelEntities.forEach(label => {
+      const dbLabel = dbLabels.find(i => i.name == label.name && i.repo_id == label.repo_id);
+      if (dbLabel) {
+        label.id = dbLabel.id;
+      }
+    })
+    return labelEntities;
+  }
+
+  private async createOrUpdateLabels(repo_id: number, datas: GitLabelAPIResponse[]): Promise<LabelEntity[]> {
+    let labelEntities = datas.map(label => ({
+      ...LabelEntity.from(label),
+      repo_id: repo_id
+    }));
+    labelEntities = await this.remapDbLabels(labelEntities);
+    return await this.labelRepo.save(labelEntities);
+  }
+
+  async fetchIssueColumns(token: string, repo_id: number, repo_name: string, repo_owner, issue_id: number, issue_number: number): Promise<IssueColumnEntity[]> {
+    const allIssueColumns = await this.githubApi.getAllIssueColumns(token, repo_name, repo_owner, issue_number);
+    return await this.createOrUpdateIssueColumns(repo_id, issue_id, allIssueColumns);
+  }
+
+  async remapIssueColumns(repo_id: number, issue_id: number, datas: GitIssueColumnAPIResponse[]): Promise<IssueColumnEntity[]> {
+    const dbProjs = await this.projRepo.find({ where: { repo_id: repo_id } });
+    const dbCols = await this.columnRepo.find();
+    const issueColEntities = datas.map(issueCol => {
+      const dbProj = dbProjs.find(i => i.external_id == issueCol.proj_external_id);
+      const dbCol = dbCols.find(i => i.proj_id == dbProj.id && i.external_id == issueCol.col_external_id);
+      return {
+        ...new IssueColumnEntity(),
+        col_id: dbCol.id,
+        proj_id: dbProj.id,
+        issue_id: issue_id
+      }
+    });
+    return issueColEntities;
+  }
+
+  private async createOrUpdateIssueColumns(repo_id: number, issue_id: number, datas: GitIssueColumnAPIResponse[]): Promise<IssueColumnEntity[]> {
+    let issueColEntities = await this.remapIssueColumns(repo_id, issue_id, datas);
+    return await this.issueColumnRepo.save(issueColEntities);
+  }
+
+  async getRepos(username: string): Promise<RepositoryEntity[]> {
+    const user: User = await this.userRepo.findOne({ where: { username: username } });
+    const user_id = user.id;
+    return this.repoRepo.find({
+      where: {
+        user_id
+      }
+    })
+  }
+
+  async getRepoExtended(repo_id: number): Promise<RepositoryExtendedResponse> {
+    let { created_at, external_id, ...repo } = await this.repoRepo.findOne(repo_id);
+    let user = await this.getUserResponse(repo.user_id, null);
+    return {
+      ...repo,
+      user_name: user.name,
+      user_avatar: user.avatar_url,
+      user_email: user.email
     }
+  }
 
-    getAllRepos(user_id: string): Promise<RepositoryEntity[]> {
-        return this.repoRepo.find({
-            where: {
-                user_id
-            }
-        })
+  async getAllRepos(username: string): Promise<RepositoryExtendedResponse[]> {
+    return Promise.all((await this.getRepos(username)).map(repo => {
+      return this.getRepoExtended(repo.id);
+    }));
+  }
+
+  async getUserResponse(user_id?: string, user_name?: string): Promise<ProfileResponse> {
+    if (user_name) {
+      let { created_at, updated_at, id, username, external_token, ...user } = await this.userRepo.findOne({ where: { username: user_name } });
+      return user;
+    } else {
+      if (user_id) {
+        let { created_at, updated_at, id, username, external_token, ...user } = await this.userRepo.findOne(user_id);
+        return user;
+      }
     }
+    return null;
+  }
 
-    fetchIssues(repo_name, repo_owner, token) {
-        const issues = this.githubApi.getIssues(repo_name, repo_owner, token);
-        issues.then(data => data.map(issue => {
-            this.mileRepo.findOne({
-                where: { node_id: issue.mile_node_id }
-            }).then(mile => {
-                const issueDto = {
-                    ...IssueEntity.from(issue),
-                    mile_id: mile ? mile.id : null,
-                }
-                const issueExists = this.issueRepo.findOne({
-                    where: { external_id: issueDto.external_id }
-                })
-                issueExists.then(data => {
-                    if (!data) {
-                        this.issueRepo.save(issueDto);
-                    }
+  private async createOrUpdateHook(repo_id: number, req: object): Promise<Hook> {
+    let hook = {
+      ...Hook.from(req),
+      repo_id: repo_id
+    }
+    return
+  }
+
+  async registerHook(req: object): Promise<any> {
+    const user: User = await this.userRepo.findOne({ where: { username: req['username'] } });
+    if (req['repo_name']) {
+      const repo: RepositoryEntity = await this.repoRepo.findOne({ where: { name: req['repo_name'] } })
+      return this.githubApi.registerHook(user.username, user.external_token, req['repo_name']).then(
+        response => {
+          if (response.status == 201) {
+            const hook = {
+              ...Hook.from(response),
+              repo_id: repo.id
+            };
+            this.hookRepo.findOne({
+              where: {
+                external_id: hook.external_id,
+                repo_id: hook.repo_id
+              }
+            }).then(val => {
+              if (!val) {
+                this.hookRepo.save(hook).then(() => {
+                  this.fetchDatas(user, repo);
                 });
-                return issueDto;
-            })
-        }))
-    }
-
-    fetchLabels(repo_name, repo_owner, token) {
-        const labels = this.githubApi.getLabels(repo_name, repo_owner, token);
-        labels.then(data => data.map(label => {
-            const labelExists = this.labelRepo.findOne({
-                where: { node_id: label.node_id }
-            })
-            labelExists.then(data => {
-                if (!data) {
-                    this.labelRepo.save(label);
-                }
-            })
-        }))
-    }
-
-    fetchProjects(repo_name, repo_owner, token) {
-        const projects = this.githubApi.getProjects(repo_name, repo_owner, token);
-        projects.then(data => data.map(project => {
-            const projectExists = this.projRepo.findOne({
-                where: { external_id: project.external_id }
+              }
             });
-            projectExists.then(data => {
-                if (!data) {
-                    this.projRepo.save(project);
-                }
-            })
-        }));
+            repo.sync = true;
+            this.repoRepo.save(repo);
+          }
+        }
+      );
     }
+  }
 
-    fetchMilestones(repo_name, repo_owner, token) {
-        const milestones = this.githubApi.getMilestone(repo_name, repo_owner, token);
-        milestones.then(data => data.map(milestone => {
-            const milestoneExists = this.mileRepo.findOne({
-                where: { node_id: milestone.node_id }
-            })
-            milestoneExists.then(data => {
-                if (!data) {
-                    this.mileRepo.save(milestone);
-                }
-            })
-        }))
-    }
+  async fetchDatas(user: User, repo: RepositoryEntity) {
+    const fetchProjects = await this.fetchProjects(user.external_token, repo.id, repo.name, repo.owner);
+    fetchProjects.forEach(async i => {
+      const fetchColumns = await this.fetchColumns(user.external_token, repo.name, repo.owner, i.id, i.number);
+    });
 
-    fetchColumns(repo_name, repo_owner, token) {
-        const columns = this.githubApi.getColumns(repo_name, repo_owner, token);
-        columns.then(data => data.map(colProjs => {
-            colProjs.forEach(col => {
-                const colExists = this.colRepo.findOne({
-                    where: { external_id: col.external_id }
-                })
-                colExists.then(data => {
-                    if (!data) {
-                        this.colRepo.save(col);
-                    }
-                })
-            });
-        }));
-    }
+    const fetchIssues = await this.fetchIssues(user.external_token, repo.id, repo.name, repo.owner);
+    fetchIssues.forEach(async i => {
+      const fetchAssignees = await this.fetchAssignees(user.external_token, repo.name, repo.owner, i.id, i.number);
+      const fetchComments = await this.fetchComments(user.external_token, repo.name, repo.owner, i.id, i.number);
+      const fetchIssueColumns = await this.fetchIssueColumns(user.external_token, repo.id, repo.name, repo.owner, i.id, i.number);
+    });
 
-    fetchIssueLabels(repo_name, repo_owner, token) {
-        const issueLabels = this.githubApi.getIssueLabels(repo_name, repo_owner, token);
-        issueLabels.then(data => data.map(issLabel => {
-            issLabel.forEach(isslab => {
-                //Get label id by url response
-                const label = this.labelRepo.findOne({
-                    where: { url: isslab.label_url }
-                })
-                label.then(data => {
-                    if (data) {
-                        const isslabDto = {
-                            external_issue_id: isslab.issue_id,
-                            label_id: data.id,
-                        }
-                        const isslabExists = this.isslabRepo.findOne({
-                            where: {
-                                external_issue_id: isslabDto.external_issue_id,
-                                label_id: isslabDto.label_id,
-                            }
-                        })
-                        isslabExists.then(data => {
-                            if (!data) {
-                                this.isslabRepo.save(isslabDto);
-                            }
-                        })
-                    }
-                })
-            });
-        }))
-    }
+    const fetchMilestones = await this.fetchMilestones(user.external_token, repo.name, repo.owner, repo.id);
+    const fetchLabels = await this.fetchLabels(user.external_token, repo.name, repo.owner, repo.id);
 
-    fetchIssueColumns(repo_name, repo_owner, token) {
-        const issueColumns = this.githubApi.getIssueColumns(repo_name, repo_owner, token);
-        issueColumns.then(data => data.map(issCols => {
-            issCols.forEach(issCol => {
-                const issColExists = this.isscolRepo.findOne({
-                    where: {
-                        external_col_id: issCol.external_col_id,
-                        external_issue_id: issCol.external_issue_id,
-                    }
-                })
-                issColExists.then(data => {
-                    if (!data) {
-                        if (issCol.external_col_id != null) {
-                            this.isscolRepo.save(issCol);
-                        }
-                    }
-                })
-            });
-        }))
-    }
+  }
 
-    fetchIssueAssignees(repo_name, repo_owner, token) {
-        const issueAssignees = this.githubApi.getIssueAssignees(repo_name, repo_owner, token);
-        issueAssignees.then(data => data.map(issAss => {
-            issAss.forEach(val => {
-                const issAssExists = this.issassRepo.findOne({
-                    where: {
-                        external_issue_id: val.external_issue_id,
-                        username: val.username,
-                    }
-                })
-                issAssExists.then(data => {
-                    if (!data) {
-                        this.issassRepo.save(val)
-                    }
-                })
-            })
-        }))
-    }
-
-    fetchComments(repo_name, repo_owner, token) {
-        const comments = this.githubApi.getComments(repo_name, repo_owner, token);
-        comments.then(data => data.map(comments => {
-            comments.forEach(comment => {
-                const commentExists = this.commentRepo.findOne({
-                    where: { external_id: comment.external_id }
-                })
-                commentExists.then(data => {
-                    if (!data) {
-                        this.commentRepo.save(comment);
-                    }
-                })
-            });
-        }))
-    }
-
-    fillDataOfRepo(repo, user_id) {
-        const user = this.userRepo.findOne({
-            where: {
-                id: user_id,
-            }
+  async getSyncRepos(username: string): Promise<RepositoryEntity[]> {
+    return new Promise(async resovle => {
+      try {
+        const user = await this.userRepo.findOne({ where: { username: username } })
+        const repos = await this.repoRepo.find({
+          where: { user_id: user.id, sync: true }
         })
-        user.then(val => {
-            this.fetchIssues(repo.name, repo.owner, val.external_token);
+        resovle(repos)
+      } catch (err) {
+        console.log(err)
+      }
+    })
+  }
 
-            this.fetchLabels(repo.name, repo.owner, val.external_token);
-
-            this.fetchProjects(repo.name, repo.owner, val.external_token);
-
-            this.fetchMilestones(repo.name, repo.owner, val.external_token);
-
-            this.fetchColumns(repo.name, repo.owner, val.external_token);
-
-            this.fetchIssueLabels(repo.name, repo.owner, val.external_token);
-
-            this.fetchIssueColumns(repo.name, repo.owner, val.external_token);
-
-            this.fetchIssueAssignees(repo.name, repo.owner, val.external_token);
-
-            this.fetchComments(repo.name, repo.owner, val.external_token);
-        })
-        return Promise.all([
-            this.issueRepo.find({ where: { repo_id: repo.external_id } }),
-            this.labelRepo.find({ where: { repo_id: repo.external_id } }),
-            this.projRepo.find({ where: { repo_id: repo.external_id } }),
-            this.mileRepo.find({ where: { repo_id: repo.external_id } }),
-            this.colRepo.query(`
-                select column_entity.* 
-                from column_entity, project_entity
-                where column_entity.external_proj_id = project_entity.external_id
-                and project_entity.repo_id = ${repo.external_id}
-            `),
-            this.isslabRepo.query(`
-                select issue_label_entity.* 
-                from issue_label_entity, issue_entity
-                where issue_label_entity.external_issue_id = issue_entity.external_id
-                and issue_entity.repo_id = ${repo.external_id}
-            `),
-            this.isscolRepo.query(`
-                select issue_column_entity.* 
-                from issue_column_entity, issue_entity
-                where issue_column_entity.external_issue_id = issue_entity.external_id
-                and issue_entity.repo_id = ${repo.external_id} 
-            `),
-            this.issassRepo.query(`
-                select issue_assignee_entity.* 
-                from issue_assignee_entity, issue_entity
-                where issue_assignee_entity.external_issue_id = issue_entity.external_id
-                and issue_entity.repo_id = ${repo.external_id}
-            `),
-            this.commentRepo.query(`
-                select comment_entity.* 
-                from comment_entity, issue_entity
-                where comment_entity.external_issue_id = issue_entity.external_id
-                and issue_entity.repo_id = ${repo.external_id}
-            `),
-        ]).then(val => {
-            const data = [
-                { 'issues': val[0] },
-                { 'labels': val[1] },
-                { 'projects': val[2] },
-                { 'milestones': val[3] },
-                { 'columns': val[4] },
-                { 'issue_labels': val[5] },
-                { 'issue_columns': val[6] },
-                { 'issue_assignees': val[7] },
-                { 'comments': val[8] },
-            ]
-            return data;
-        })
-    }
-
-    getData(){ 
-        return this.issueRepo.find();
-    }
-
-    listenIssue(data) {
-        switch (data.action) {
-            case 'opened': {
-                const url = `${data.repository.html_url}/issues/${data.issue.number}`;
-                this.mileRepo.findOne({ node_id: data.milestone ? data.milestone.node_id : null }).then(mile => {
-                    let mile_id = null;
-                    if (mile) {
-                        mile_id = mile.id;
-                    }
-                    const issue = {
-                        external_id: data.issue.id,
-                        number: data.issue.number,
-                        name: data.issue.title,
-                        author: data.issue.user.login,
-                        content: data.issue.body,
-                        url: url,
-                        state: data.issue.state,
-                        repo_id: data.repository.id,
-                        mile_id: mile_id,
-                    }
-                    if (issue) {
-                        this.issueRepo.save(issue);
-                    }
-                })
-                return {
-                    state: 'create',
-                    data: this.issueRepo.findOne({
-                        where: { external_id: data.issue.id }
-                    }),
-                };
-            }
-
-            case 'edited': {
-                const newIssue = {
-                    name: data.issue.title,
-                    content: data.issue.body,
-                }
-                if (newIssue) {
-                    this.issueRepo.update({ external_id: data.issue.id }, newIssue);
-                }
-                return {
-                    state: 'update',
-                    data: this.issueRepo.findOne({
-                        where: { external_id: data.issue.id }
-                    })
-                };
-            }
-
-            case 'deleted': {
-                const issueDel = this.issueRepo.findOne({
-                    where: { external_id: data.issue.id }
-                })
-                this.commentRepo.delete({ external_issue_id: data.issue.id });
-                this.isslabRepo.delete({ external_issue_id: data.issue.id });
-                this.isscolRepo.delete({ external_issue_id: data.issue.id });
-                this.issassRepo.delete({ external_issue_id: data.issue.id });
-
-                this.issueRepo.delete({ external_id: data.issue.id });
-                return {
-                    state: 'delete',
-                    data: issueDel,
-                };
-            }
-
-            case 'closed': {
-                this.issueRepo.update(
-                    { external_id: data.issue.id },
-                    { state: data.issue.state }
-                )
-                break;
-            }
-
-            case 'reopened': {
-                this.issueRepo.update(
-                    { external_id: data.issue.id },
-                    { state: data.issue.state }
-                )
-                break;
-            }
-
-            case 'milestoned': {
-                this.mileRepo.findOne({
-                    where: { node_id: data.milestone.node_id }
-                }).then(mile => {
-                    this.issueRepo.update(
-                        {
-                            external_id: data.issue.id,
-                        },
-                        {
-                            mile_id: mile.id,
-                        }
-                    );
-                })
-                break;
-            }
-
-            case 'demilestoned': {
-                this.mileRepo.findOne({
-                    where: { node_id: data.milestone.node_id }
-                }).then(mile => {
-                    this.issueRepo.update(
-                        {
-                            external_id: data.issue.id,
-                            mile_id: mile.id,
-                        },
-                        {
-                            mile_id: null,
-                        }
-                    );
-                })
-                break;
-            }
+  async getSyncIssues(username: string): Promise<IssueEntity[]> {
+    try {
+      const repos = await this.getSyncRepos(username);
+      let issues: IssueEntity[] = [];
+      await Promise.all(repos.map(async repo => {
+        const issueList = await this.issueRepo.find({ where: { repo_id: repo.id } });
+        if (issueList && issueList.length > 0) {
+          issues = issues.concat(issueList);
         }
+      }));
+      return issues;
+    } catch (e) {
+      console.log(e)
     }
+  }
 
-    listenProject(data) {
-        switch (data.action) {
-            case 'created': {
-                const project = {
-                    external_id: data.project.id,
-                    number: data.project.number,
-                    name: data.project.name,
-                    content: data.project.body,
-                    state: data.project.state,
-                    repo_id: data.repository.id,
-                }
-                if (project) {
-                    this.projRepo.save(project);
-                }
-                break;
-            }
-
-            case 'edited': {
-                const newProject = {
-                    name: data.project.name,
-                    content: data.project.body,
-                }
-                if (newProject) {
-                    this.projRepo.update({ external_id: data.project.id }, newProject);
-                }
-                break;
-            }
-
-            case 'deleted': {
-                this.projRepo.delete({ external_id: data.project.id });
-                break;
-            }
-
-            case 'closed': {
-                this.projRepo.update(
-                    { external_id: data.project.id },
-                    { state: data.project.state }
-                )
-                break;
-            }
-
-            case 'reopened': {
-                this.projRepo.update(
-                    { external_id: data.project.id },
-                    { state: data.project.state }
-                )
-                break;
-            }
+  async getSyncProjects(username: string): Promise<ProjectEntity[]> {
+    try {
+      const repos = await this.getSyncRepos(username);
+      let projects: ProjectEntity[] = [];
+      await Promise.all(repos.map(async repo => {
+        const projs = await this.projRepo.find({ where: { repo_id: repo.id } });
+        if (projs && projs.length > 0) {
+          projects = projects.concat(projs);
         }
+      }));
+      return projects;
+    } catch (error) {
+      console.log(error)
     }
+  }
 
-    listenLabel(data) {
-        switch (data.action) {
-            case 'created': {
-                const name = data.label.name.split(' ').join('%20');
-                const url = `${data.repository.html_url}/labels/${name}`;
-                const label = {
-                    node_id: data.label.node_id,
-                    url: url,
-                    name: data.label.name,
-                    color: data.label.color,
-                    description: data.label.description,
-                    repo_id: data.repository.id,
-                }
-                if (label) {
-                    this.labelRepo.save(label);
-                }
-                break;
-            }
-
-            case 'edited': {
-                const name = data.label.name.split(' ').join('%20');
-                const url = `${data.repository.html_url}/labels/${name}`;
-                const newLabel = {
-                    url: url,
-                    name: data.label.name,
-                    color: data.label.color,
-                    description: data.label.description,
-                }
-                if (newLabel) {
-                    this.labelRepo.update({ node_id: data.label.node_id }, newLabel);
-                }
-                break;
-            }
-
-            case 'deleted': {
-                this.labelRepo.delete({ node_id: data.label.node_id });
-                break;
-            }
+  async remapAssigneeResponse(assignees: Assignee[]): Promise<AssigneeResponse[]> {
+    try {
+      const assigns = await Promise.all(assignees.map(async assign => {
+        const user = await this.userRepo.findOne(assign.user_id);
+        return {
+          user_id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar_url: user.avatar_url,
+          issue_id: assign.issue_id
         }
+      }));
+      return assigns;
+    } catch (error) {
+
     }
+    return
+  }
 
-    listenMilestone(data) {
-        switch (data.action) {
-            case 'created': {
-                const url = `${data.repository.html_url}/milestone/${data.milestone.number}`;
-                const milestone = {
-                    name: data.milestone.title,
-                    description: data.milestone.description,
-                    url: url,
-                    node_id: data.milestone.node_id,
-                    creator: data.milestone.creator.login,
-                    number: data.milestone.number,
-                    state: data.milestone.state,
-                    due_on: data.milestone.due_on,
-                    close_at: data.milestone.close_at,
-                    repo_id: data.repository.id,
-                }
-                if (milestone) {
-                    this.mileRepo.save(milestone);
-                }
-                break;
-            }
-            case 'edited': {
-                console.log(data);
-                const newMilestone = {
-                    name: data.milestone.title,
-                    description: data.milestone.description,
-                    due_on: data.milestone.due_on,
-                }
-                if (newMilestone) {
-                    this.mileRepo.update({ node_id: data.milestone.node_id }, newMilestone);
-                }
-                break;
-            }
-            case 'deleted': {
-                this.mileRepo.delete({ node_id: data.milestone.node_id })
-                break;
-            }
-
-            case 'closed': {
-                this.mileRepo.update(
-                    { node_id: data.milestone.node_id },
-                    { state: data.milestone.state }
-                )
-                break;
-            }
-
-            case 'opened': {
-                this.mileRepo.update(
-                    { node_id: data.milestone.node_id },
-                    { state: data.milestone.state }
-                )
-                break;
-            }
+  async getSyncAssignees(username: string): Promise<AssigneeResponse[]> {
+    try {
+      const issues = await this.getSyncIssues(username);
+      let assignees: AssigneeResponse[] = [];
+      await Promise.all(issues.map(async issue => {
+        let assigns = await this.assigneeRepo.find({ where: { issue_id: issue.id } });
+        if (assigns && assigns.length > 0) {
+          assignees = assignees.concat(await this.remapAssigneeResponse(assigns));
         }
+      }));
+      return assignees;
+    } catch (error) {
+      console.log(error);
     }
+  }
 
-    listenColumn(data) {
-        switch (data.action) {
-            case 'created': {
-                //Get project id from webhook
-                const projUrl = data.project_column.project_url;
-                const projId = Number(projUrl[projUrl.length - 1]);
-
-                //Get project url from webhook
-                this.projRepo.findOne({
-                    where: { external_id: projId }
-                }).then(val => {
-                    const url = `${data.repository.html_url}/projects/${val.number}/columns/${data.project_column.id}`;
-                    const column = {
-                        url: url,
-                        external_id: data.project_column.id,
-                        name: data.project_column.name,
-                        external_proj_id: projId,
-                    }
-                    if (column) {
-                        this.colRepo.save(column);
-                    }
-                })
-                break;
-            }
-            case 'edited': {
-                this.colRepo.update(
-                    { external_id: data.project_column.id },
-                    { name: data.project_column.name }
-                )
-                break;
-            }
-            case 'deleted': {
-                this.colRepo.delete({ external_id: data.project_column.id })
-                break;
-            }
+  async payloadsGitHookHandler(req: any) {
+    if (req === null || req === undefined) {
+      return;
+    }
+    if (req['repository']) {
+      const user = await this.userRepo.findOne({ where: { username: req['sender'].login } });
+      const repo = await this.repoRepo.findOne({
+        where: {
+          external_id: req['repository'].id,
+          user_id: user.id
         }
+      });
+      this.fetchDatas(user, repo);
     }
-
-    listenIssueLable(data) {
-        switch (data.action) {
-            case 'labeled': {
-                this.labelRepo.findOne({
-                    where: { node_id: data.label.node_id }
-                }).then(label => {
-                    if (label) {
-                        const isslabel = {
-                            external_issue_id: data.issue.id,
-                            label_id: label.id,
-                        }
-                        this.isslabRepo.save(isslabel);
-                    }
-                })
-                break;
-            }
-
-            case 'unlabeled': {
-                this.labelRepo.findOne({
-                    where: { node_id: data.label.node_id }
-                }).then(label => {
-                    if (label) {
-                        const isslabel = {
-                            external_issue_id: data.issue.id,
-                            label_id: label.id,
-                        }
-                        if (isslabel.external_issue_id != null && isslabel.label_id != null) {
-                            this.isslabRepo.delete(isslabel);
-                        }
-                    }
-                })
-                break;
-            }
-        }
-
-    }
-
-    listenIssueAssignee(data) {
-        switch (data.action) {
-            case 'assigned': {
-                const issAssignee = {
-                    external_issue_id: data.issue.id,
-                    username: data.assignee.login,
-                }
-                if (issAssignee.external_issue_id != null && issAssignee.username != null) {
-                    this.issassRepo.save(issAssignee);
-                }
-                break;
-            }
-
-            case 'unassigned': {
-                const issAssignee = {
-                    external_issue_id: data.issue.id,
-                    username: data.assignee.login,
-                }
-                this.issassRepo.delete(issAssignee);
-                break;
-            }
-        }
-    }
-
-    listenIssueColumn(data) {
-        //Get issue_number from webhook
-        const content_url = data.project_card.content_url;
-        const issue_number = Number(content_url[content_url.length - 1]);
-
-        switch (data.action) {
-            case 'moved': {
-                this.issueRepo.findOne({
-                    where: { number: issue_number }
-                }).then(issue => {
-                    this.isscolRepo.update(
-                        {
-                            external_issue_id: issue.external_id,
-                            external_col_id: data.changes.column_id.from,
-                        },
-                        {
-                            external_issue_id: issue.external_id,
-                            external_col_id: data.project_card.column_id,
-                        }
-                    )
-                })
-                break;
-            }
-
-            case 'deleted': {
-                this.issueRepo.findOne({
-                    where: { number: issue_number }
-                }).then(issue => {
-                    this.isscolRepo.delete({
-                        external_issue_id: issue.external_id,
-                        external_col_id: data.project_card.column_id,
-                    })
-                })
-                break;
-            }
-
-            case 'created': {
-                this.issueRepo.findOne({
-                    where: { number: issue_number }
-                }).then(issue => {
-                    this.isscolRepo.save({
-                        external_issue_id: issue.external_id,
-                        external_col_id: data.project_card.column_id,
-                    })
-                })
-                break;
-            }
-        }
-    }
-
-    listenComment(data): Promise<any> {
-        switch (data.action) {
-            case 'created': {
-                const comment = {
-                    external_issue_id: data.issue.id,
-                    external_id: data.comment.id,
-                    author: data.comment.user.login,
-                    content: data.comment.body,
-                }
-                if (comment) {
-                    this.commentRepo.save(comment);
-                }
-                return this.commentRepo.findOne({ where: { external_id: comment.external_id } });
-                break;
-            }
-
-            case 'edited': {
-                this.commentRepo.update(
-                    { external_id: data.comment.id },
-                    { content: data.comment.body }
-                )
-                break;
-            }
-
-            case 'deleted': {
-                this.commentRepo.delete({ external_id: data.comment.id })
-                break;
-            }
-        }
-    }
-
-    listenWebhooks(gitEvent, data){
-        switch (gitEvent) {
-            case 'issues': {
-                if (!data.label && !data.assignee) {
-                    return this.listenIssue(data);
-                }
-                if (data.label) {
-                    return this.listenIssueLable(data);
-                }
-                if (data.assignee) {
-                    return this.listenIssueAssignee(data);
-                }
-                break;
-            }
-            case 'issue_comment': {
-                return this.listenComment(data);
-                break;
-            }
-            case 'project_card': {
-                return this.listenIssueColumn(data);
-                break;
-            }
-            case 'project': {
-                return this.listenProject(data);
-                break;
-            }
-            case 'label': {
-                return this.listenLabel(data);
-                break;
-            }
-            case 'milestone': {
-                return this.listenMilestone(data);
-                break;
-            }
-            case 'project_column': {
-                return this.listenColumn(data);
-                break;
-            }
-
-        }
-        return null;
-    }
+  }
 }

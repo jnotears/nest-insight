@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GithubModule } from './github/github.module';
 
+
 @Module({
   imports: [
     HttpModule,
@@ -29,6 +30,8 @@ import { GithubModule } from './github/github.module';
     GithubModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+  ],
 })
-export class AppModule {}
+export class AppModule { }
