@@ -1,0 +1,19 @@
+version: "3.8"
+services:
+    api:
+        image: registry.gitlab.com/laituanmanh32/etopgitx:latest
+        ports:
+            - 6300:3000
+        env_file: .env
+        depends_on: 
+            - db
+    db:
+        image: postgres:12-alpine
+        volumes:
+            - ./db-data:/var/lib/postgresql/data
+        environment:
+            POSTGRES_PASSWORD: insight@production
+            POSTGRES_USER: insight
+            POSTGRES_DB: insight
+        ports:
+            - 6432:5432
