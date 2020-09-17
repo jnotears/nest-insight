@@ -16,7 +16,6 @@ export class AirTableApi {
         private readonly config: ConfigService
 
     ) { }
-
     private createHeaders(api_key: string): any {
         return {
             'Content-Type': 'application/json',

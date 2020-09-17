@@ -496,7 +496,6 @@ export class GithubService {
         this.fetchDatas(user, repo);
       }
     } catch (error) {
-
     }
   }
 
@@ -782,4 +781,5 @@ export class GithubService {
       
     }
   }
+
 }
