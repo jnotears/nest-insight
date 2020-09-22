@@ -34,6 +34,9 @@ export class IssueEntity extends EntityBase{
     @Column({nullable: true})
     closed_at: Date;
 
+    @Column({nullable: true})
+    estimate: number;
+
     static from(data: GitIssueAPIResponse): IssueEntity{
       return {
         ...new IssueEntity(),

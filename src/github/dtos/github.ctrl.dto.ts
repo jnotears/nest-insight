@@ -7,9 +7,9 @@ export interface RepositoryExtendedResponse{
     name: string;
     user_id: string;
     updated_at: Date;
-    user_name: string;
-    user_avatar: string;
-    user_email: string;
+    owner_name: string;
+    owner_avatar: string;
+    owner_email: string;
 }
 
 export interface AssigneeResponse{
@@ -19,3 +19,14 @@ export interface AssigneeResponse{
     avatar_url: string;
     issue_id: number;
 }
+
+export interface UserResponse{
+    id: string;
+    username: string;
+    name: string;
+    email: string;  
+    avatar_url: string;
+    created_at: Date;
+    updated_at: Date;
+}
+

@@ -1,4 +1,3 @@
-export const callbackUrl = 'http://fa41ad6bdba6.ngrok.io/api.github/hooks.listener';
 
 export const eventList = [
   'push',
@@ -19,14 +18,3 @@ export const eventList = [
   'watch',
   'member'
 ];
-
-export const hooksConfig = {
-    "name": "web",
-    "active": true,
-    "events": eventList,
-    "config":{
-      "url": callbackUrl,
-      "content_type": "json",
-      "insecure": "0"
-    }
-}

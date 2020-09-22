@@ -5,10 +5,12 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { RepositoryEntity } from "./entities/repository.entity";
 import { JwtService } from "@nestjs/jwt";
-import { ProfileResponse, GitRepositoryAPIResponse, GitIssueAPIResponse, 
-GitProjectAPIResponse, GitColumnAPIResponse, GitCommentAPIResponse, 
-GitMilestoneAPIResponse, GithubProfileAPIResponse, GitLabelAPIResponse, 
-GitIssueColumnAPIResponse } from "./dtos/github.api.dto";
+import {
+  GitRepositoryAPIResponse, GitIssueAPIResponse,
+  GitProjectAPIResponse, GitColumnAPIResponse, GitCommentAPIResponse,
+  GitMilestoneAPIResponse, GithubProfileAPIResponse, GitLabelAPIResponse,
+  GitIssueColumnAPIResponse
+} from "./dtos/github.api.dto";
 import { ProjectEntity } from "./entities/project.entity";
 import { IssueEntity } from "./entities/issue.entity";
 import { ColumnEntity } from "./entities/column.entity";
@@ -18,7 +20,15 @@ import { Assignee } from "./entities/assignee.entity";
 import { Hook } from "./entities/hook.entity";
 import { LabelEntity } from "./entities/label.entity";
 import { IssueColumnEntity } from "./entities/issue.column.entity";
-import { AssigneeResponse, RepositoryExtendedResponse } from './dtos/github.ctrl.dto';
+import { AssigneeResponse, UserResponse } from './dtos/github.ctrl.dto';
+import { IssueMileStoneEntity } from "./entities/issue.milestone.entity";
+import { IssueLabelEntity } from "./entities/issue.label.entity";
+import { AirTableApi } from "./airtable.api";
+import { AirTableIssueHandling } from "./dtos/airtable.api.dto";
+import { ConfigService } from "@nestjs/config";
+import { IssueAirTable } from "./entities/issue.airtable.entity";
+import { UserAirTable } from "./entities/user.airtable.entity";
+
 
 @Injectable()
 export class GithubService {
@@ -34,9 +44,16 @@ export class GithubService {
     @InjectRepository(Hook) private hookRepo: Repository<Hook>,
     @InjectRepository(LabelEntity) private labelRepo: Repository<LabelEntity>,
     @InjectRepository(IssueColumnEntity) private issueColumnRepo: Repository<IssueColumnEntity>,
+    @InjectRepository(IssueLabelEntity) private issueLabelRepo: Repository<IssueLabelEntity>,
+    @InjectRepository(IssueMileStoneEntity) private issueMileRepo: Repository<IssueMileStoneEntity>,
+    @InjectRepository(IssueAirTable) private issueAirRepo: Repository<IssueAirTable>,
+    @InjectRepository(UserAirTable) private userAirRepo: Repository<UserAirTable>,
+
 
     private githubApi: GithubApi,
-    private jwtService: JwtService
+    private jwtService: JwtService,
+    private airTableApi: AirTableApi,
+    private config: ConfigService
   ) { }
 
   getGithubAccessToken(code: string): Promise<object> {
@@ -345,6 +362,164 @@ export class GithubService {
     return await this.issueColumnRepo.save(issueColEntities);
   }
 
+  async fetchIssueMilestones(token: string, repo_id: number, repo_name: string, repo_owner: string, milestone_id: number, milestone_number: number): Promise<IssueMileStoneEntity[]> {
+    const allIssueMilestones = await this.githubApi.getAllIssueMilestones(token, repo_name, repo_owner, milestone_number);
+    return await this.createOrUpdateIssueMilestones(repo_id, milestone_id, allIssueMilestones);
+  }
+
+
+  async remapIssueMilestones(repo_id: number, milestone_id: number, datas: number[]): Promise<IssueMileStoneEntity[]> {
+    try {
+      let dbIssues: IssueEntity[] = [];
+      await Promise.all(datas.map(async ex_id => {
+        const dbIssue = await this.issueRepo.findOne({ where: { external_id: ex_id, repo_id: repo_id } });
+        if (dbIssue) {
+          dbIssues = dbIssues.concat(dbIssue);
+        }
+      }));
+      let issueMileEntities: IssueMileStoneEntity[] = [];
+      dbIssues.forEach(issue => {
+        const issueMileEntity = {
+          ...new IssueMileStoneEntity(),
+          issue_id: issue.id,
+          milestone_id: milestone_id
+        }
+        issueMileEntities = issueMileEntities.concat(issueMileEntity);
+      });
+      return issueMileEntities;
+    } catch (error) {
+
+    }
+  }
+
+  private async createOrUpdateIssueMilestones(repo_id: number, milestone_id: number, datas: number[]): Promise<IssueMileStoneEntity[]> {
+    let issueMileEntities = await this.remapIssueMilestones(repo_id, milestone_id, datas);
+    return await this.issueMileRepo.save(issueMileEntities);
+  }
+
+  async fetchIssueLabels(token: string, repo_id: number, repo_name: string, repo_owner: string, issue_id: number, issue_number: number): Promise<IssueLabelEntity[]> {
+    const allIssueLabels = await this.githubApi.getAllIssuelabels(token, repo_name, repo_owner, issue_number);
+    return await this.createOrUpdateIssueLabels(repo_id, issue_id, allIssueLabels);
+  }
+
+  async remapIssueLabels(repo_id: number, issue_id: number, datas: string[]): Promise<IssueLabelEntity[]> {
+    try {
+      let dbLabels: LabelEntity[] = [];
+      await Promise.all(datas.map(async label_name => {
+        const dbLabel = await this.labelRepo.findOne({ where: { name: label_name, repo_id: repo_id } });
+        if (dbLabel) {
+          dbLabels = dbLabels.concat(dbLabel);
+        }
+      }));
+      let issueLabelEntities: IssueLabelEntity[] = [];
+      dbLabels.forEach(label => {
+        const issueLabelEntity = {
+          ...new IssueLabelEntity(),
+          issue_id: issue_id,
+          label_id: label.id
+        }
+        issueLabelEntities = issueLabelEntities.concat(issueLabelEntity);
+      });
+      return issueLabelEntities;
+    } catch (error) {
+
+    }
+  }
+
+  private async createOrUpdateIssueLabels(repo_id: number, issue_id: number, datas: string[]): Promise<IssueLabelEntity[]> {
+    let issueLabelEntities = await this.remapIssueLabels(repo_id, issue_id, datas);
+    return await this.issueLabelRepo.save(issueLabelEntities);
+  }
+
+  private async createOrUpdateHook(user_id: string, repo_id: number, response: any): Promise<Hook> {
+    try {
+      let hook = {
+        ...Hook.from(response),
+        repo_id: repo_id,
+        owner: user_id
+      }
+      const dbHook = await this.hookRepo.findOne({ where: { repo_id: repo_id, owner: user_id } });
+      if (dbHook) {
+        hook.id = dbHook.id;
+      }
+      return await this.hookRepo.save(hook);
+    } catch (error) {
+
+    }
+  }
+
+  async registerHook(req: { repo_id: number }): Promise<Hook> {
+    try {
+      const repo = await this.repoRepo.findOne(req['repo_id']);
+      const user = await this.userRepo.findOne(repo.user_id);
+      const response = await this.githubApi.registerHook(user.external_token, repo.user_id, repo.owner, repo.name);
+      if (response === undefined || response === null || response['status'] != 201) {
+        return;
+      }
+      repo.sync = true;
+      this.repoRepo.save(repo);
+      this.fetchDatas(user, repo);
+      return await this.createOrUpdateHook(user.id, repo.id, response);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async deleteIssue(external_id: number, repo_id: number) {
+    const dbIssue = await this.issueRepo.findOne({ where: { external_id: external_id, repo_id: repo_id } });
+    if (dbIssue) {
+      return await this.issueRepo.remove(dbIssue);
+    }
+    return;
+  }
+
+  async payloadsGitHookHandler(req: any, user_id: string) {
+    if (req === null || req === undefined) {
+      return;
+    }
+    try {
+      if (req['repository']) {
+        const user = await this.userRepo.findOne(user_id);
+        const repo = await this.repoRepo.findOne({
+          where: {
+            external_id: req['repository'].id,
+            user_id: user.id
+          }
+        });
+        if (req['action']) {
+          if (req['action'] == 'deleted') {
+            if (req['issue']) {
+              return await this.deleteIssue(req['issue'].id, repo.id);
+            }
+          }
+        }
+        this.fetchDatas(user, repo);
+      }
+    } catch (error) {
+
+    }
+  }
+
+  async getUser(id?: string, username?: string): Promise<UserResponse> {
+    try {
+      if (id) {
+        const { external_token, ...user } = await this.userRepo.findOne(id);
+        if (user) {
+          return user;
+        }
+      }
+      if (username) {
+        const { external_token, ...user } = await this.userRepo.findOne({ where: { username: username } });
+        if (user) {
+          return user;
+        }
+      }
+      return;
+    } catch (error) {
+
+    }
+  }
+
   async getRepos(username: string): Promise<RepositoryEntity[]> {
     const user: User = await this.userRepo.findOne({ where: { username: username } });
     const user_id = user.id;
@@ -352,94 +527,75 @@ export class GithubService {
       where: {
         user_id
       }
-    })
-  }
-
-  async getRepoExtended(repo_id: number): Promise<RepositoryExtendedResponse> {
-    let { created_at, external_id, ...repo } = await this.repoRepo.findOne(repo_id);
-    let user = await this.getUserResponse(repo.user_id, null);
-    return {
-      ...repo,
-      user_name: user.name,
-      user_avatar: user.avatar_url,
-      user_email: user.email
-    }
-  }
-
-  async getAllRepos(username: string): Promise<RepositoryExtendedResponse[]> {
-    return Promise.all((await this.getRepos(username)).map(repo => {
-      return this.getRepoExtended(repo.id);
-    }));
-  }
-
-  async getUserResponse(user_id?: string, user_name?: string): Promise<ProfileResponse> {
-    if (user_name) {
-      let { created_at, updated_at, id, username, external_token, ...user } = await this.userRepo.findOne({ where: { username: user_name } });
-      return user;
-    } else {
-      if (user_id) {
-        let { created_at, updated_at, id, username, external_token, ...user } = await this.userRepo.findOne(user_id);
-        return user;
-      }
-    }
-    return null;
-  }
-
-  private async createOrUpdateHook(repo_id: number, req: object): Promise<Hook> {
-    let hook = {
-      ...Hook.from(req),
-      repo_id: repo_id
-    }
-    return
-  }
-
-  async registerHook(req: object): Promise<any> {
-    const user: User = await this.userRepo.findOne({ where: { username: req['username'] } });
-    if (req['repo_name']) {
-      const repo: RepositoryEntity = await this.repoRepo.findOne({ where: { name: req['repo_name'] } })
-      return this.githubApi.registerHook(user.username, user.external_token, req['repo_name']).then(
-        response => {
-          if (response.status == 201) {
-            const hook = {
-              ...Hook.from(response),
-              repo_id: repo.id
-            };
-            this.hookRepo.findOne({
-              where: {
-                external_id: hook.external_id,
-                repo_id: hook.repo_id
-              }
-            }).then(val => {
-              if (!val) {
-                this.hookRepo.save(hook).then(() => {
-                  this.fetchDatas(user, repo);
-                });
-              }
-            });
-            repo.sync = true;
-            this.repoRepo.save(repo);
-          }
-        }
-      );
-    }
+    });
   }
 
   async fetchDatas(user: User, repo: RepositoryEntity) {
+    const air_config = await this.userAirRepo.findOne({ where: { user_id: user.id, active: true } })
+    const fetchMilestones = await this.fetchMilestones(user.external_token, repo.name, repo.owner, repo.id);
+    const fetchLabels = await this.fetchLabels(user.external_token, repo.name, repo.owner, repo.id);
+
     const fetchProjects = await this.fetchProjects(user.external_token, repo.id, repo.name, repo.owner);
     fetchProjects.forEach(async i => {
       const fetchColumns = await this.fetchColumns(user.external_token, repo.name, repo.owner, i.id, i.number);
     });
 
     const fetchIssues = await this.fetchIssues(user.external_token, repo.id, repo.name, repo.owner);
-    fetchIssues.forEach(async i => {
-      const fetchAssignees = await this.fetchAssignees(user.external_token, repo.name, repo.owner, i.id, i.number);
-      const fetchComments = await this.fetchComments(user.external_token, repo.name, repo.owner, i.id, i.number);
-      const fetchIssueColumns = await this.fetchIssueColumns(user.external_token, repo.id, repo.name, repo.owner, i.id, i.number);
+    fetchIssues.forEach(async issue => {
+      const fetchAssignees = await this.fetchAssignees(user.external_token, repo.name, repo.owner, issue.id, issue.number);
+      const fetchComments = await this.fetchComments(user.external_token, repo.name, repo.owner, issue.id, issue.number);
+      const fetchIssueColumns = await this.fetchIssueColumns(user.external_token, repo.id, repo.name, repo.owner, issue.id, issue.number);
+      const fetchIssueLabels = await this.fetchIssueLabels(user.external_token, repo.id, repo.name, repo.owner, issue.id, issue.number);
+      if (air_config) {
+        if (fetchIssueColumns && fetchIssueColumns.length > 0) {
+          fetchIssueColumns.forEach(async element => {
+            this.fillDataToAirTable(air_config.api_key, air_config.base_id, air_config.table_name, issue, element.proj_id);
+          });
+        }
+      }
     });
 
-    const fetchMilestones = await this.fetchMilestones(user.external_token, repo.name, repo.owner, repo.id);
-    const fetchLabels = await this.fetchLabels(user.external_token, repo.name, repo.owner, repo.id);
+    fetchMilestones.forEach(async i => {
+      const fetchIssueMilestones = await this.fetchIssueMilestones(user.external_token, repo.id, repo.name, repo.owner, i.id, i.number);
+    });
+  }
 
+  async remapAirTableHandling(api_key: string, base_id: string, table_name: string, issue: IssueEntity, project_name: string) {
+    const data: AirTableIssueHandling = {
+      issue: issue,
+      project_name: project_name,
+      record_id: ''
+    }
+    const apiData = await this.airTableApi.getIssuesByProjectName(api_key, base_id, table_name, project_name);
+    if (apiData && apiData.records.length > 0) {
+      apiData.records.forEach(element => {
+        if (data.issue.name == element.fields.Name) {
+          data.record_id = element.id;
+        }
+      });
+    }
+    return data;
+  }
+
+  async createOrUpdateIssueAirtable(issue_id: number, issue_name: string, record_id: string, project_name: string) {
+    const issueAir: IssueAirTable = {
+      ...new IssueAirTable(),
+      issue_id: issue_id,
+      record_id: record_id,
+      project_name: project_name,
+      issue_name: issue_name,
+    }
+    return await this.issueAirRepo.save(issueAir);
+  }
+
+  async fillDataToAirTable(api_key: string, base_id: string, table_name: string, issue: IssueEntity, project_id: number) {
+    const proj = await this.projRepo.findOne(project_id);
+    const data: AirTableIssueHandling = await this.remapAirTableHandling(api_key, base_id, table_name, issue, proj.name);
+    this.updateIssueFromAirTableWithInterval(api_key, base_id, table_name);
+    const response = await this.airTableApi.createOrUpdateIssueRecord(api_key, base_id, table_name, data);
+    if (response && response['id']) {
+      return await this.createOrUpdateIssueAirtable(issue.id, issue.name, response['id'], proj.name);
+    }
   }
 
   async getSyncRepos(username: string): Promise<RepositoryEntity[]> {
@@ -523,19 +679,107 @@ export class GithubService {
     }
   }
 
-  async payloadsGitHookHandler(req: any) {
-    if (req === null || req === undefined) {
-      return;
-    }
-    if (req['repository']) {
-      const user = await this.userRepo.findOne({ where: { username: req['sender'].login } });
-      const repo = await this.repoRepo.findOne({
-        where: {
-          external_id: req['repository'].id,
-          user_id: user.id
+  async getSyncMilestones(username: string): Promise<MilestoneEntity[]> {
+    try {
+      const repos = await this.getSyncRepos(username);
+      let milestones: MilestoneEntity[] = [];
+      await Promise.all(repos.map(async repo => {
+        let miles = await this.milestoneRepo.find({ where: { repo_id: repo.id } });
+        if (miles && miles.length > 0) {
+          milestones = milestones.concat(miles);
         }
-      });
-      this.fetchDatas(user, repo);
+      }));
+      return milestones;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  private async updateIssue(record_id: string, estimate: number) {
+    try {
+      const issueAir = await this.issueAirRepo.findOne({ where: { record_id: record_id } });
+      if (issueAir) {
+        const issue = await this.issueRepo.findOne(issueAir.issue_id);
+        issue.estimate = estimate;
+        return this.issueRepo.save(issue);
+      }
+    } catch (error) {
+
+    }
+  }
+
+  isInWorkingTime(workTimes: { startTime: number, endTime: number }[]): boolean {
+    try {
+      if (workTimes || workTimes.length > 0) {
+        let boolean = false;
+        const now = (new Date).toLocaleString("en-US", { timeZone: "Asia/Ho_chi_minh" });
+        const timeNow = (new Date(new Date(now).toISOString())).getHours();
+        workTimes.forEach(point => {
+          if (timeNow >= point.startTime && timeNow <= point.endTime) {
+            boolean = true;
+          }
+        })
+        if(boolean){
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+
+    }
+  }
+
+  async updateIssueFromAirTableWithInterval(api_key: string, base_id: string, table_name: string) {
+    try {
+      setInterval(async () => {
+        if (this.isInWorkingTime([{ startTime: 8, endTime: 24 }])) {
+          const datas = await this.airTableApi.getAllIssues(api_key, base_id, table_name);
+          if (datas && datas['records'].length > 0) {
+            const issueAirs = datas['records'];
+            issueAirs.forEach(element => {
+              const issue = element['fields'];
+              if (issue && issue['Estimate Time']) {
+                this.updateIssue(element['id'], issue['Estimate Time']);
+              }
+            });
+          }
+        }
+      }, this.config.get<number>('AIRTABLE_API_TIMEOUT'))
+    } catch (error) {
+
+    }
+  }
+
+  async createOrUpdateAirTableConfig(req: { user_id: string, api_key: string, base_id: string, table_name: string, connect_name: string, active: boolean }): Promise<UserAirTable> {
+    try {
+      const config = {
+        ...new UserAirTable(),
+        user_id: req.user_id,
+        api_key: req.api_key,
+        base_id: req.base_id,
+        table_name: req.table_name,
+        connect_name: req.connect_name,
+        active: req.active
+      }
+      return await this.userAirRepo.save(config);
+    } catch (error) {
+
+    }
+  }
+
+  async getAirConfigs(username: string): Promise<UserAirTable> {
+    const user = await this.getUser(null, username);
+    return await this.userAirRepo.findOne({ where: { user_id: user.id, active: true } });
+  }
+
+  async deteleAirConfig(req: {user_id: string, api_key: string, base_id: string, table_name: string}){
+    try {
+      const dbAirConfig = await this.userAirRepo.findOne({where: {user_id: req.user_id, api_key: req.api_key, base_id: req.base_id, table_name: req.table_name}});
+      if(dbAirConfig){
+        return this.userAirRepo.remove(dbAirConfig);
+      }
+    } catch (error) {
+      
     }
   }
 }
