@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Req, Query, Res, UseGuards, Render } from "@nestjs/common";
+import { Controller, Post, Body, Get, Req, Query, Res, UseGuards, Render, Param, Delete } from "@nestjs/common";
 import { GithubLoginDto } from "./dtos/github.ctrl.dto";
 import { GithubService } from "./github.service";
 import { ConfigService } from "@nestjs/config";
@@ -14,7 +14,7 @@ export class GithubController {
     @Get('login')
     async login(@Res() res) {
         const client_id = this.configService.get<string>('CLIENT_ID');
-        const scope = `read:user user:email repo read:org read:repo_hook read:discussion read:enterprise read:gpg_key`;
+        const scope = `read:user user:email repo admin:org read:repo_hook read:discussion read:enterprise read:gpg_key`;
         res.redirect(`https://github.com/login/oauth/authorize?client_id=${client_id}&scope=${scope}`);
     }
 
@@ -28,8 +28,8 @@ export class GithubController {
 
     @UseGuards(JwtAuthGuard)
     @Get('repos')
-    async getAllRepos(@Query('username') username: string) {
-        return await this.githubService.getAllRepos(username);
+    async getRepos(@Query('username') username: string) {
+        return await this.githubService.getRepos(username);
     }
 
     @UseGuards(JwtAuthGuard)
@@ -41,7 +41,7 @@ export class GithubController {
     @UseGuards(JwtAuthGuard)
     @Get('user')
     async getUser(@Query('username') username: string) {
-        return await this.githubService.getUserResponse(null, username);
+        return await this.githubService.getUser(null, username);
     }
 
     @UseGuards(JwtAuthGuard)
@@ -68,26 +68,26 @@ export class GithubController {
         return this.githubService.getSyncAssignees(username);
     }
 
-    @Post('hooks.listener')
-    listenGitWebHook(@Req() req) {
-        console.log(req);
+    @Post('hooks.listener/:id')
+    listenGitWebHook(@Req() req, @Param() user_id: string) {
         if (req['body']) {
-            return this.githubService.payloadsGitHookHandler(req['body']);
+            return this.githubService.payloadsGitHookHandler(req['body'], user_id);
         }
-        // lay datas tu api
-        // Tien xu ly datas => normDatas
-        // database.save(normDatas)
-
-
-        // Xu ly Hook
-        // nhan rawData
-        // Tien xy ly datas => normData
-        // database.save(normData).
-
-        // dbUser <= db
-        // dbRepo <= db
-        // this.githubService.fetchIssue(dbUser.token, dbRepo.id, dbRepo.name, req.Issue.id);
-
-
     }
+
+    @Post('airtable.config')
+    createAirConfig(@Body() req: {user_id: string, api_key: string, base_id: string, table_name: string, connect_name: string, active: boolean}){
+        return this.githubService.createOrUpdateAirTableConfig(req);
+    }
+
+    @Get('airtable.config')
+    getAirConfigs(@Query('username') username: string){
+        return this.githubService.getAirConfigs(username);
+    }
+
+    @Delete('airtable.config')
+    async removeAirConfig(@Body() req: {user_id: string, api_key: string, base_id: string, table_name: string}){
+        return await this.githubService.deteleAirConfig(req);
+    }
+
 }

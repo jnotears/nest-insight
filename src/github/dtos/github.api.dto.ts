@@ -5,12 +5,6 @@ export interface GithubProfileAPIResponse {
     avatar_url: string
 }
 
-export interface ProfileResponse{
-    name: string;
-    email: string;
-    avatar_url: string
-}
-
 export interface GitRepositoryAPIResponse {
     external_id: string;
     name: string;
@@ -71,6 +65,10 @@ export interface GitLabelAPIResponse {
 export interface GitIssueColumnAPIResponse{
     col_external_id: number;
     proj_external_id: number;
+}
+
+export interface GitIssueMilestoneAPIResponse{
+
 }
 
 

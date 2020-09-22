@@ -1,7 +1,8 @@
-import { Entity, Column, PrimaryColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { EntityBase } from 'src/shared/base/entity.base';
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
-export class Hook {
+export class Hook extends EntityBase{
     @PrimaryGeneratedColumn()
     id: number;
 
@@ -13,6 +14,9 @@ export class Hook {
 
     @Column()
     url: string;
+
+    @Column({nullable: true})
+    owner: string;
 
     @Column()
     repo_id: number;
