@@ -217,7 +217,7 @@ export class GithubService {
       const dbIssue = dbIssues.find(i => i.external_id == issue.external_id && i.repo_id == issue.repo_id);
       if (dbIssue) {
         issue.id = dbIssue.id;
-        if(!issue.estimate){
+        if (!issue.estimate) {
           issue.estimate = dbIssue.estimate;
         }
       }
@@ -623,7 +623,7 @@ export class GithubService {
           const projects = await this.getAllProjectInTable(config.id);
           projects.forEach(async project => {
             const issueCols = await this.issueColumnRepo.find({ where: { proj_id: project.id } });
-            if(issueCols && issueCols.length > 0){
+            if (issueCols && issueCols.length > 0) {
               issueCols.forEach(async issueCol => {
                 const issue = await this.issueRepo.findOne(issueCol.issue_id);
                 const data: AirTableIssueHandling = await this.remapAirTableHandling(config, issue, project.name);
@@ -792,6 +792,7 @@ export class GithubService {
             const issueAirs = datas['records'];
             issueAirs.forEach(element => {
               const issue = element['fields'];
+              console.log('issue', issue);
               if (issue && issue['Estimate Time']) {
                 this.updateIssue(element['id'], issue['Estimate Time']);
               }

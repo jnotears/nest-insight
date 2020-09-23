@@ -100,7 +100,7 @@ export class AirTableApi {
 
     async getAllIssues(config: AirTableConfig) {
         const url = this.createAirtableApiUrl(config.base_id, config.table_name);
-        return await this.rawData(HttpMethod.get, url, null, this.createHttpOptions(config.api_key));
+        return await this.rawData<any>(HttpMethod.get, url, null, this.createHttpOptions(config.api_key));
     }
 }
 
