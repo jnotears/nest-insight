@@ -814,4 +814,10 @@ export class GithubApi {
     }
   }
 
+  async deleteHook(token: string, hook_url: string){
+    return await this.http.delete<any>(hook_url, this.createHttpOptions(token))
+      .toPromise()
+      .then(response => response.data);
+  }
+
 }

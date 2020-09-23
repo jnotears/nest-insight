@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { AxiosRequestConfig } from 'axios';
 import { Injectable, HttpService } from '@nestjs/common';
 import { AirTableIssueHandling } from './dtos/airtable.api.dto';
+import { AirTableConfig } from './entities/airtable.config.entity';
 
 const enum HttpMethod {
     get,
@@ -66,13 +67,13 @@ export class AirTableApi {
         }
     }
 
-    createOrUpdateIssues(api_key: string, base_id: string, table_name: string, issues: AirTableIssueHandling[]) {
+    createOrUpdateIssues(config: AirTableConfig, issues: AirTableIssueHandling[]) {
         issues.forEach(issue => {
-            this.createOrUpdateIssueRecord(api_key, base_id, table_name, issue)
+            this.createOrUpdateIssueRecord(config, issue)
         })
     }
 
-    async createOrUpdateIssueRecord(api_key: string, base_id: string, table_name: string, datas: AirTableIssueHandling) {
+    async createOrUpdateIssueRecord(config: AirTableConfig, datas: AirTableIssueHandling) {
         const data = `{
             "fields": {
                 ${datas.project_name ? `"Project": "${datas.project_name}",` : ''}
@@ -80,27 +81,26 @@ export class AirTableApi {
                 ${datas.issue.content ? `"Description": "${datas.issue.content}",` : ''}
                 ${datas.issue.created_at ? `"Created At": "${datas.issue.created_at}",` : ''}
                 ${datas.issue.updated_at ? `"Updated At": "${datas.issue.updated_at}",` : ''}
-                ${datas.issue.estimate ? `"Estimate Time": "${datas.issue.estimate}",` : ''}
+                ${datas.issue.estimate ? `"Estimate Time": ${datas.issue.estimate},` : ''}
                 ${datas.issue.name ? `"Name": "${datas.issue.name}"` : ''}
             }
         }`;
-
         if (datas.record_id) {
-            const url = this.createAirtableApiUrl(base_id, table_name, datas.record_id);
-            return await this.rawData<any>(HttpMethod.patch, url, data, this.createHttpOptions(api_key));
+            const url = this.createAirtableApiUrl(config.base_id, config.table_name, datas.record_id);
+            return await this.rawData<any>(HttpMethod.patch, url, data, this.createHttpOptions(config.api_key));
         }
-        const url = this.createAirtableApiUrl(base_id, table_name);
-        return await this.rawData<any>(HttpMethod.post, url, data, this.createHttpOptions(api_key));
+        const url = this.createAirtableApiUrl(config.base_id, config.table_name);
+        return await this.rawData<any>(HttpMethod.post, url, data, this.createHttpOptions(config.api_key));
     }
 
-    async getIssuesByProjectName(api_key: string, base_id: string, table_name: string, project_name: string) {
-        const url = this.createAirtableApiUrl(base_id, table_name, '', [], { field: 'Project', value: project_name });
-        return await this.rawData<any>(HttpMethod.get, url, null, this.createHttpOptions(api_key));
+    async getIssuesByProjectName(config: AirTableConfig, project_name: string) {
+        const url = this.createAirtableApiUrl(config.base_id, config.table_name, '', [], { field: 'Project', value: project_name });
+        return await this.rawData<any>(HttpMethod.get, url, null, this.createHttpOptions(config.api_key));
     }
 
-    async getAllIssues(api_key: string, base_id: string, table_name: string) {
-        const url = this.createAirtableApiUrl(base_id, table_name);
-        return await this.rawData(HttpMethod.get, url, null, this.createHttpOptions(api_key));
+    async getAllIssues(config: AirTableConfig) {
+        const url = this.createAirtableApiUrl(config.base_id, config.table_name);
+        return await this.rawData(HttpMethod.get, url, null, this.createHttpOptions(config.api_key));
     }
 }
 

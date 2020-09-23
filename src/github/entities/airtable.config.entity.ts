@@ -1,18 +1,21 @@
 import { EntityBase } from 'src/shared/base/entity.base';
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
-export class UserAirTable extends EntityBase{
-    @PrimaryColumn()
+export class AirTableConfig extends EntityBase{
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column()
     user_id: string;
 
-    @PrimaryColumn()
+    @Column()
     api_key: string;
 
-    @PrimaryColumn()
+    @Column()
     base_id: string;
 
-    @PrimaryColumn()
+    @Column()
     table_name: string;
 
     @Column()

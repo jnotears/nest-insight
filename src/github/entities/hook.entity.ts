@@ -18,7 +18,7 @@ export class Hook extends EntityBase{
     @Column({nullable: true})
     owner: string;
 
-    @Column()
+    @Column({nullable: true})
     repo_id: number;
 
     static from(response: any){

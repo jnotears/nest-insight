@@ -1,8 +1,9 @@
-import { Controller, Post, Body, Get, Req, Query, Res, UseGuards, Render, Param, Delete } from "@nestjs/common";
+import { Controller, Post, Body, Get, Req, Query, Res, UseGuards, Render, Param, Delete, Headers } from "@nestjs/common";
 import { GithubLoginDto } from "./dtos/github.ctrl.dto";
 import { GithubService } from "./github.service";
 import { ConfigService } from "@nestjs/config";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { AirTableConfig } from "./entities/airtable.config.entity";
 
 @Controller('api.github')
 export class GithubController {
@@ -28,14 +29,14 @@ export class GithubController {
 
     @UseGuards(JwtAuthGuard)
     @Get('repos')
-    async getRepos(@Query('username') username: string) {
-        return await this.githubService.getRepos(username);
+    async getRepos(@Headers() headers) {
+        return await this.githubService.getRepos(headers);
     }
 
     @UseGuards(JwtAuthGuard)
     @Get('repos/sync')
-    async getSyncRepos(@Query('username') username: string) {
-        return await this.githubService.getSyncRepos(username);
+    async getSyncRepos(@Headers() headers) {
+        return await this.githubService.getSyncRepos(headers);
     }
 
     @UseGuards(JwtAuthGuard)
@@ -51,43 +52,63 @@ export class GithubController {
     }
 
     @UseGuards(JwtAuthGuard)
+    @Delete('hooks/:repo_id')
+    async deleteWebhook(@Param('repo_id') repo_id: number){
+        return await this.githubService.deleteHook(repo_id);
+    }
+
+    @UseGuards(JwtAuthGuard)
     @Get('issues')
-    async getSyncIssues(@Query('username') username: string) {
-        return this.githubService.getSyncIssues(username);
+    async getSyncIssues(@Headers() headers) {
+        return this.githubService.getSyncIssues(headers);
     }
 
     @UseGuards(JwtAuthGuard)
     @Get('projects')
-    async getSyncProjects(@Query('username') username: string) {
-        return this.githubService.getSyncProjects(username);
+    async getSyncProjects(@Headers() headers) {
+        return this.githubService.getSyncProjects(headers);
     }
 
     @UseGuards(JwtAuthGuard)
     @Get('assignees')
-    async getSyncAssignees(@Query('username') username: string) {
-        return this.githubService.getSyncAssignees(username);
+    async getSyncAssignees(@Headers() headers) {
+        return this.githubService.getSyncAssignees(headers);
     }
 
     @Post('hooks.listener/:id')
-    listenGitWebHook(@Req() req, @Param() user_id: string) {
+    listenGitWebHook(@Req() req, @Param('id') user_id: string) {
         if (req['body']) {
             return this.githubService.payloadsGitHookHandler(req['body'], user_id);
         }
     }
 
     @Post('airtable.config')
-    createAirConfig(@Body() req: {user_id: string, api_key: string, base_id: string, table_name: string, connect_name: string, active: boolean}){
-        return this.githubService.createOrUpdateAirTableConfig(req);
+    createAirConfig(@Body() config: AirTableConfig){
+        return this.githubService.createOrUpdateAirTableConfig(config);
     }
 
     @Get('airtable.config')
-    getAirConfigs(@Query('username') username: string){
-        return this.githubService.getAirConfigs(username);
+    getAirConfigs(@Headers() headers){
+        return this.githubService.getAirConfigs(headers);
     }
 
     @Delete('airtable.config')
-    async removeAirConfig(@Body() req: {user_id: string, api_key: string, base_id: string, table_name: string}){
-        return await this.githubService.deteleAirConfig(req);
+    async removeAirConfig(@Body() config){
+        return await this.githubService.deteleAirConfig(config);
     }
 
+    @Post('airtable.config/project')
+    async createtProjectAirtable(@Body() projAir){
+        return await this.githubService.createOrUpdateProjectAirTable(projAir);
+    }
+
+    @Get('airtable.config/projects')
+    async getProjectAirs(@Query('config_id') config_id: number){
+        return await this.githubService.getAllProjectInTable(config_id);
+    }
+
+    @Delete('airtable.config/project')
+    async removeProjectAirTable(@Body() projAir){
+        return await this.githubService.deleteProjectAirTable(projAir);
+    }
 }

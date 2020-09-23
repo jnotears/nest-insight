@@ -27,7 +27,8 @@ import { AirTableApi } from "./airtable.api";
 import { AirTableIssueHandling } from "./dtos/airtable.api.dto";
 import { ConfigService } from "@nestjs/config";
 import { IssueAirTable } from "./entities/issue.airtable.entity";
-import { UserAirTable } from "./entities/user.airtable.entity";
+import { AirTableConfig } from "./entities/airtable.config.entity";
+import { ProjectAirTable } from "./entities/project.airtable.entity";
 
 
 @Injectable()
@@ -47,7 +48,8 @@ export class GithubService {
     @InjectRepository(IssueLabelEntity) private issueLabelRepo: Repository<IssueLabelEntity>,
     @InjectRepository(IssueMileStoneEntity) private issueMileRepo: Repository<IssueMileStoneEntity>,
     @InjectRepository(IssueAirTable) private issueAirRepo: Repository<IssueAirTable>,
-    @InjectRepository(UserAirTable) private userAirRepo: Repository<UserAirTable>,
+    @InjectRepository(AirTableConfig) private airConfigRepo: Repository<AirTableConfig>,
+    @InjectRepository(ProjectAirTable) private projAirRepo: Repository<ProjectAirTable>,
 
 
     private githubApi: GithubApi,
@@ -465,6 +467,22 @@ export class GithubService {
     }
   }
 
+  async deleteHook(repo_id: number): Promise<Hook> {
+    try {
+      const hook = await this.hookRepo.findOne({ where: { repo_id: repo_id } });
+      if (hook) {
+        const repo = await this.repoRepo.findOne(repo_id);
+        const user = await this.userRepo.findOne(repo.user_id);
+        this.githubApi.deleteHook(user.external_token, hook.url);
+        repo.sync = false;
+        await this.repoRepo.save(repo);
+        return await this.hookRepo.remove(hook);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
   async deleteIssue(external_id: number, repo_id: number) {
     const dbIssue = await this.issueRepo.findOne({ where: { external_id: external_id, repo_id: repo_id } });
     if (dbIssue) {
@@ -519,9 +537,8 @@ export class GithubService {
     }
   }
 
-  async getRepos(username: string): Promise<RepositoryEntity[]> {
-    const user: User = await this.userRepo.findOne({ where: { username: username } });
-    const user_id = user.id;
+  async getRepos(headers: any): Promise<RepositoryEntity[]> {
+    const user_id = this.decodePayloadFromHeaders(headers)['sub'];
     return this.repoRepo.find({
       where: {
         user_id
@@ -530,7 +547,7 @@ export class GithubService {
   }
 
   async fetchDatas(user: User, repo: RepositoryEntity) {
-    const air_config = await this.userAirRepo.findOne({ where: { user_id: user.id, active: true } })
+    const air_configs = await this.airConfigRepo.find({ where: { user_id: user.id, active: true } })
     const fetchMilestones = await this.fetchMilestones(user.external_token, repo.name, repo.owner, repo.id);
     const fetchLabels = await this.fetchLabels(user.external_token, repo.name, repo.owner, repo.id);
 
@@ -545,27 +562,23 @@ export class GithubService {
       const fetchComments = await this.fetchComments(user.external_token, repo.name, repo.owner, issue.id, issue.number);
       const fetchIssueColumns = await this.fetchIssueColumns(user.external_token, repo.id, repo.name, repo.owner, issue.id, issue.number);
       const fetchIssueLabels = await this.fetchIssueLabels(user.external_token, repo.id, repo.name, repo.owner, issue.id, issue.number);
-      if (air_config) {
-        if (fetchIssueColumns && fetchIssueColumns.length > 0) {
-          fetchIssueColumns.forEach(async element => {
-            this.fillDataToAirTable(air_config.api_key, air_config.base_id, air_config.table_name, issue, element.proj_id);
-          });
-        }
-      }
     });
-
     fetchMilestones.forEach(async i => {
       const fetchIssueMilestones = await this.fetchIssueMilestones(user.external_token, repo.id, repo.name, repo.owner, i.id, i.number);
     });
+
+    if (air_configs && air_configs.length > 0) {
+      this.fillDataToAirTable(user.id);
+    }
   }
 
-  async remapAirTableHandling(api_key: string, base_id: string, table_name: string, issue: IssueEntity, project_name: string) {
+  async remapAirTableHandling(config: AirTableConfig, issue: IssueEntity, project_name: string) {
     const data: AirTableIssueHandling = {
       issue: issue,
       project_name: project_name,
       record_id: ''
     }
-    const apiData = await this.airTableApi.getIssuesByProjectName(api_key, base_id, table_name, project_name);
+    const apiData = await this.airTableApi.getIssuesByProjectName(config, project_name);
     if (apiData && apiData.records.length > 0) {
       apiData.records.forEach(element => {
         if (data.issue.name == element.fields.Name) {
@@ -587,22 +600,51 @@ export class GithubService {
     return await this.issueAirRepo.save(issueAir);
   }
 
-  async fillDataToAirTable(api_key: string, base_id: string, table_name: string, issue: IssueEntity, project_id: number) {
-    const proj = await this.projRepo.findOne(project_id);
-    const data: AirTableIssueHandling = await this.remapAirTableHandling(api_key, base_id, table_name, issue, proj.name);
-    this.updateIssueFromAirTableWithInterval(api_key, base_id, table_name);
-    const response = await this.airTableApi.createOrUpdateIssueRecord(api_key, base_id, table_name, data);
-    if (response && response['id']) {
-      return await this.createOrUpdateIssueAirtable(issue.id, issue.name, response['id'], proj.name);
+  async getAllProjectInTable(config_id: number): Promise<ProjectEntity[]> {
+    let projects: ProjectEntity[] = [];
+    const projAirs = await this.projAirRepo.find({ where: { config_id: config_id } });
+    if (projAirs && projAirs.length > 0) {
+      await Promise.all(projAirs.map(async projAir => {
+        const dbProj = await this.projRepo.findOne(projAir.project_id);
+        projects = projects.concat(dbProj);
+      }));
+    }
+    return projects;
+  }
+
+  async fillDataToAirTable(user_id: string) {
+    try {
+      const configs = await this.airConfigRepo.find({ where: { user_id: user_id } });
+      if (configs && configs.length > 0) {
+        configs.forEach(async config => {
+          const projects = await this.getAllProjectInTable(config.id);
+          projects.forEach(async project => {
+            const issueCols = await this.issueColumnRepo.find({ where: { proj_id: project.id } });
+            if(issueCols && issueCols.length > 0){
+              issueCols.forEach(async issueCol => {
+                const issue = await this.issueRepo.findOne(issueCol.issue_id);
+                const data: AirTableIssueHandling = await this.remapAirTableHandling(config, issue, project.name);
+                this.updateIssueFromAirTableWithInterval(config);
+                const response = await this.airTableApi.createOrUpdateIssueRecord(config, data);
+                if (response && response['id']) {
+                  return await this.createOrUpdateIssueAirtable(issue.id, issue.name, response['id'], project.name);
+                }
+              })
+            }
+          });
+        });
+      }
+    } catch (error) {
+
     }
   }
 
-  async getSyncRepos(username: string): Promise<RepositoryEntity[]> {
+  async getSyncRepos(headers: any): Promise<RepositoryEntity[]> {
+    const user_id = this.decodePayloadFromHeaders(headers)['sub'];
     return new Promise(async resovle => {
       try {
-        const user = await this.userRepo.findOne({ where: { username: username } })
         const repos = await this.repoRepo.find({
-          where: { user_id: user.id, sync: true }
+          where: { user_id: user_id, sync: true }
         })
         resovle(repos)
       } catch (err) {
@@ -611,9 +653,9 @@ export class GithubService {
     })
   }
 
-  async getSyncIssues(username: string): Promise<IssueEntity[]> {
+  async getSyncIssues(headers: any): Promise<IssueEntity[]> {
     try {
-      const repos = await this.getSyncRepos(username);
+      const repos = await this.getSyncRepos(headers);
       let issues: IssueEntity[] = [];
       await Promise.all(repos.map(async repo => {
         const issueList = await this.issueRepo.find({ where: { repo_id: repo.id } });
@@ -627,9 +669,10 @@ export class GithubService {
     }
   }
 
-  async getSyncProjects(username: string): Promise<ProjectEntity[]> {
+  async getSyncProjects(headers: any): Promise<ProjectEntity[]> {
     try {
-      const repos = await this.getSyncRepos(username);
+      const payload = this.decodePayloadFromHeaders(headers)
+      const repos = await this.getSyncRepos(payload['sub']);
       let projects: ProjectEntity[] = [];
       await Promise.all(repos.map(async repo => {
         const projs = await this.projRepo.find({ where: { repo_id: repo.id } });
@@ -662,9 +705,18 @@ export class GithubService {
     return
   }
 
-  async getSyncAssignees(username: string): Promise<AssigneeResponse[]> {
+  private decodePayloadFromHeaders(headers: any): {} {
+    let token: string = headers['authorization'];
+    token = token.split(' ')[1];
+    const payload = this.jwtService.decode(token);
+    return payload;
+  }
+
+  async getSyncAssignees(headers: any): Promise<AssigneeResponse[]> {
     try {
-      const issues = await this.getSyncIssues(username);
+      const payload = this.decodePayloadFromHeaders(headers);
+      console.log(payload);
+      const issues = await this.getSyncIssues(payload['sub']);
       let assignees: AssigneeResponse[] = [];
       await Promise.all(issues.map(async issue => {
         let assigns = await this.assigneeRepo.find({ where: { issue_id: issue.id } });
@@ -718,7 +770,7 @@ export class GithubService {
             boolean = true;
           }
         })
-        if(boolean){
+        if (boolean) {
           return true;
         }
       }
@@ -728,11 +780,11 @@ export class GithubService {
     }
   }
 
-  async updateIssueFromAirTableWithInterval(api_key: string, base_id: string, table_name: string) {
+  async updateIssueFromAirTableWithInterval(config: AirTableConfig) {
     try {
       setInterval(async () => {
         if (this.isInWorkingTime([{ startTime: 8, endTime: 24 }])) {
-          const datas = await this.airTableApi.getAllIssues(api_key, base_id, table_name);
+          const datas = await this.airTableApi.getAllIssues(config);
           if (datas && datas['records'].length > 0) {
             const issueAirs = datas['records'];
             issueAirs.forEach(element => {
@@ -749,36 +801,54 @@ export class GithubService {
     }
   }
 
-  async createOrUpdateAirTableConfig(req: { user_id: string, api_key: string, base_id: string, table_name: string, connect_name: string, active: boolean }): Promise<UserAirTable> {
+  async createOrUpdateAirTableConfig(config: AirTableConfig): Promise<AirTableConfig> {
     try {
-      const config = {
-        ...new UserAirTable(),
-        user_id: req.user_id,
-        api_key: req.api_key,
-        base_id: req.base_id,
-        table_name: req.table_name,
-        connect_name: req.connect_name,
-        active: req.active
+      const dbAirConfig = await this.airConfigRepo.findOne({
+        where: {
+          user_id: config.user_id,
+          api_key: config.api_key,
+          base_id: config.base_id,
+          table_name: config.table_name
+        }
+      });
+      if (dbAirConfig) {
+        config.id = dbAirConfig.id;
       }
-      return await this.userAirRepo.save(config);
+      return await this.airConfigRepo.save(config);
     } catch (error) {
 
     }
   }
 
-  async getAirConfigs(username: string): Promise<UserAirTable> {
-    const user = await this.getUser(null, username);
-    return await this.userAirRepo.findOne({ where: { user_id: user.id, active: true } });
+  async getAirConfigs(headers: any): Promise<AirTableConfig> {
+    const user_id = this.decodePayloadFromHeaders(headers)['sub'];
+    return await this.airConfigRepo.findOne({ where: { user_id: user_id, active: true } });
   }
 
-  async deteleAirConfig(req: {user_id: string, api_key: string, base_id: string, table_name: string}){
+  async deteleAirConfig(config: AirTableConfig) {
     try {
-      const dbAirConfig = await this.userAirRepo.findOne({where: {user_id: req.user_id, api_key: req.api_key, base_id: req.base_id, table_name: req.table_name}});
-      if(dbAirConfig){
-        return this.userAirRepo.remove(dbAirConfig);
+      const dbAirConfig = await this.airConfigRepo.findOne({ where: { user_id: config.user_id, api_key: config.api_key, base_id: config.base_id, table_name: config.table_name } });
+      if (dbAirConfig) {
+        return this.airConfigRepo.remove(dbAirConfig);
       }
     } catch (error) {
-      
+
+    }
+  }
+
+  async createOrUpdateProjectAirTable(projAir: ProjectAirTable): Promise<ProjectAirTable> {
+    try {
+      return await this.projAirRepo.save(projAir);
+    } catch (error) {
+
+    }
+  }
+
+  async deleteProjectAirTable(projecAir: ProjectAirTable): Promise<ProjectAirTable> {
+    try {
+      return await this.projAirRepo.remove(projecAir);
+    } catch (error) {
+
     }
   }
 }
