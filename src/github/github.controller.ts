@@ -4,6 +4,7 @@ import { GithubService } from "./github.service";
 import { ConfigService } from "@nestjs/config";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { AirTableConfig } from "./entities/airtable.config.entity";
+import { config } from "rxjs";
 
 @Controller('api.github')
 export class GithubController {
@@ -110,5 +111,20 @@ export class GithubController {
     @Delete('airtable.config/project')
     async removeProjectAirTable(@Body() projAir){
         return await this.githubService.deleteProjectAirTable(projAir);
+    }
+
+    @Post('airtable.config/table')
+    async createTableAirTable(@Body() table){
+        return await this.githubService.createOrUpdateTableAirTable(table);
+    }
+
+    @Get('airtable.config/table')
+    async getTableAirTableByConfigId(@Query('config_id') config_id: number){
+        return await this.githubService.getTableAirTableByConfigId(config_id);
+    }
+
+    @Delete('airtable.config/table/:id')
+    async removeTableAirTable(@Param('id') id){
+        return await this.githubService.deleteTableAirTable(id);
     }
 }

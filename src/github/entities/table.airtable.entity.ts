@@ -1,48 +1,52 @@
-import { EntityBase } from './../../shared/base/entity.base';
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
-export class TableAirtable extends EntityBase{
+export class TableAirTable{
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column()
+    @Column({nullable: true})
     issue_id: string;
 
-    @Column()
+    @Column({nullable: true})
     external_id: string;
 
-    @Column()
+    @Column({nullable: true})
     number: string;
 
-    @Column()
+    @Column({nullable: true})
     name: string;
 
-    @Column()
+    @Column({nullable: true})
     state: string;
 
-    @Column()
+    @Column({nullable: true})
     author: string;
 
-    @Column()
+    @Column({nullable: true})
     content: string;
 
-    @Column()
+    @Column({nullable: true})
     url: string;
 
-    @Column()
+    @Column({nullable: true})
     repo_id: string;
 
-    @Column()
+    @Column({nullable: true})
     closed_at: string;
 
-    @Column()
+    @Column({nullable: true})
     estimate: string;
 
-    @Column()
+    @Column({nullable: true})
     assignee: string;
 
     @Column()
     config_id: number;
 
+    @Column({nullable: true})
+    created_at: string;
+
+    @Column({nullable: true})
+    updated_at: string;
 }

@@ -29,8 +29,7 @@ import { ConfigService } from "@nestjs/config";
 import { IssueAirTable } from "./entities/issue.airtable.entity";
 import { AirTableConfig } from "./entities/airtable.config.entity";
 import { ProjectAirTable } from "./entities/project.airtable.entity";
-import { TableAirtable } from "./entities/table.airtable.entity";
-import { config } from "rxjs";
+import { TableAirTable } from "./entities/table.airtable.entity";
 
 
 @Injectable()
@@ -52,7 +51,7 @@ export class GithubService {
     @InjectRepository(IssueAirTable) private issueAirRepo: Repository<IssueAirTable>,
     @InjectRepository(AirTableConfig) private airConfigRepo: Repository<AirTableConfig>,
     @InjectRepository(ProjectAirTable) private projAirRepo: Repository<ProjectAirTable>,
-    @InjectRepository(TableAirtable) private tableAirRepo: Repository<TableAirtable>,
+    @InjectRepository(TableAirTable) private tableAirRepo: Repository<TableAirTable>,
 
 
     private githubApi: GithubApi,
@@ -859,7 +858,7 @@ export class GithubService {
     }
   }
 
-  async remapTableAirTable(table: TableAirtable): Promise<TableAirtable> {
+  async remapTableAirTable(table: TableAirTable): Promise<TableAirTable> {
     try {
       const dbTable = await this.tableAirRepo.findOne({ where: { config_id: table.config_id } })
       if (dbTable) {
@@ -871,18 +870,33 @@ export class GithubService {
     }
   }
 
-  async createOrUpdateTableAirTable(table: TableAirtable) {
+  async createOrUpdateTableAirTable(table: TableAirTable): Promise<TableAirTable> {
     try {
+      if (!table.config_id) {
+        return;
+      }
       table = await this.remapTableAirTable(table);
-      return await this.tableAirRepo.save(table);
+      const res = await this.tableAirRepo.save(table);
+      return res;
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  async deleteTableAirTable(id: number) {
+    try {
+      const dbTable = await this.tableAirRepo.findOne(id);
+      if (dbTable) {
+        return await this.tableAirRepo.remove(dbTable);
+      }
     } catch (error) {
 
     }
   }
 
-  async deleteTableAirTable(table: TableAirtable) {
+  async getTableAirTableByConfigId(config_id: number): Promise<TableAirTable> {
     try {
-      return await this.tableAirRepo.remove(table);
+      return await this.tableAirRepo.findOne({ where: { config_id: config_id } });
     } catch (error) {
 
     }

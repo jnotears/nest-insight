@@ -24,9 +24,9 @@ import { IssueMileStoneEntity } from './entities/issue.milestone.entity';
 import { IssueAirTable } from './entities/issue.airtable.entity';
 import { AirTableConfig } from './entities/airtable.config.entity';
 import { ProjectAirTable } from './entities/project.airtable.entity';
-import { TableAirtable } from './entities/table.airtable.entity';
+import { TableAirTable } from './entities/table.airtable.entity';
 
-const entities = [User, RepositoryEntity, ProjectEntity, IssueEntity, IssueLabelEntity, IssueAirTable, AirTableConfig, TableAirtable,
+const entities = [User, RepositoryEntity, ProjectEntity, IssueEntity, IssueLabelEntity, IssueAirTable, AirTableConfig, TableAirTable,
   ColumnEntity, CommentEntity, MilestoneEntity, Assignee, Hook, LabelEntity, IssueColumnEntity, IssueMileStoneEntity, ProjectAirTable];
 
 @Module({
