@@ -29,6 +29,8 @@ import { ConfigService } from "@nestjs/config";
 import { IssueAirTable } from "./entities/issue.airtable.entity";
 import { AirTableConfig } from "./entities/airtable.config.entity";
 import { ProjectAirTable } from "./entities/project.airtable.entity";
+import { TableAirtable } from "./entities/table.airtable.entity";
+import { config } from "rxjs";
 
 
 @Injectable()
@@ -50,6 +52,7 @@ export class GithubService {
     @InjectRepository(IssueAirTable) private issueAirRepo: Repository<IssueAirTable>,
     @InjectRepository(AirTableConfig) private airConfigRepo: Repository<AirTableConfig>,
     @InjectRepository(ProjectAirTable) private projAirRepo: Repository<ProjectAirTable>,
+    @InjectRepository(TableAirtable) private tableAirRepo: Repository<TableAirtable>,
 
 
     private githubApi: GithubApi,
@@ -851,6 +854,35 @@ export class GithubService {
   async deleteProjectAirTable(projecAir: ProjectAirTable): Promise<ProjectAirTable> {
     try {
       return await this.projAirRepo.remove(projecAir);
+    } catch (error) {
+
+    }
+  }
+
+  async remapTableAirTable(table: TableAirtable): Promise<TableAirtable> {
+    try {
+      const dbTable = await this.tableAirRepo.findOne({ where: { config_id: table.config_id } })
+      if (dbTable) {
+        table.id = dbTable.id;
+      }
+      return table;
+    } catch (error) {
+
+    }
+  }
+
+  async createOrUpdateTableAirTable(table: TableAirtable) {
+    try {
+      table = await this.remapTableAirTable(table);
+      return await this.tableAirRepo.save(table);
+    } catch (error) {
+
+    }
+  }
+
+  async deleteTableAirTable(table: TableAirtable) {
+    try {
+      return await this.tableAirRepo.remove(table);
     } catch (error) {
 
     }
