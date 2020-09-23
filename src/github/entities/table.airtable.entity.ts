@@ -49,4 +49,7 @@ export class TableAirTable{
 
     @Column({nullable: true})
     updated_at: string;
+    
+    @Column({nullable: true})
+    project_name: string;
 }

@@ -3,6 +3,7 @@ import { AxiosRequestConfig } from 'axios';
 import { Injectable, HttpService } from '@nestjs/common';
 import { AirTableIssueHandling } from './dtos/airtable.api.dto';
 import { AirTableConfig } from './entities/airtable.config.entity';
+import { TableAirTable } from './entities/table.airtable.entity';
 
 const enum HttpMethod {
     get,
@@ -67,22 +68,26 @@ export class AirTableApi {
         }
     }
 
-    createOrUpdateIssues(config: AirTableConfig, issues: AirTableIssueHandling[]) {
+    createOrUpdateIssues(config: AirTableConfig, table: TableAirTable, issues: AirTableIssueHandling[]) {
         issues.forEach(issue => {
-            this.createOrUpdateIssueRecord(config, issue)
+            this.createOrUpdateIssueRecord(config, table, issue);
         })
     }
 
-    async createOrUpdateIssueRecord(config: AirTableConfig, datas: AirTableIssueHandling) {
+    async createOrUpdateIssueRecord(config: AirTableConfig, table: TableAirTable, datas: AirTableIssueHandling) {
         const data = `{
             "fields": {
-                ${datas.project_name ? `"Project": "${datas.project_name}",` : ''}
-                ${datas.issue.state ? `"Status": "${datas.issue.state}",` : ''}
-                ${datas.issue.content ? `"Description": "${datas.issue.content}",` : ''}
-                ${datas.issue.created_at ? `"Created At": "${datas.issue.created_at}",` : ''}
-                ${datas.issue.updated_at ? `"Updated At": "${datas.issue.updated_at}",` : ''}
-                ${datas.issue.estimate ? `"Estimate Time": ${datas.issue.estimate},` : ''}
-                ${datas.issue.name ? `"Name": "${datas.issue.name}"` : ''}
+                ${table.issue_id ? `${datas.issue.id ? `"${table.issue_id}": "${datas.issue.id}",` : ''}` : ''}
+                ${table.number ? `${datas.issue.number ? `"${table.number}": "${datas.issue.number}",` : ''}` : ''}
+                ${table.estimate ? `${datas.issue.estimate ? `"${table.estimate}": "${datas.issue.estimate}",` : ''}` : ''}
+                ${table.project_name ? `${datas.project_name ? `"${table.project_name}": "${datas.project_name}",` : ''}` : ''}
+                ${table.external_id ? `${datas.issue.external_id ? `"${table.external_id}": "${datas.issue.external_id}",` : ''}` : ''}
+                ${table.state ? `${datas.issue.state ? `"${table.state}": "${datas.issue.state}",` : ''}` : ''}
+                ${table.author ? `${datas.issue.author ? `"${table.author}": "${datas.issue.author}",` : ''}` : ''}
+                ${table.content ? `${datas.issue.content ? `"${table.content}": "${datas.issue.content}",` : ''}` : ''}
+                ${table.url ? `${datas.issue.url ? `"${table.url}": "${datas.issue.url}",` : ''}` : ''}
+                ${table.repo_id ? `${datas.issue.repo_id ? `"${table.repo_id}": "${datas.issue.repo_id}",` : ''}` : ''}
+                ${table.name ? `${datas.issue.name ? `"${table.name}": "${datas.issue.name}"` : ''}` : ''}
             }
         }`;
         if (datas.record_id) {

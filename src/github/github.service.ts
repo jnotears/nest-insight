@@ -630,9 +630,12 @@ export class GithubService {
                 const issue = await this.issueRepo.findOne(issueCol.issue_id);
                 const data: AirTableIssueHandling = await this.remapAirTableHandling(config, issue, project.name);
                 this.updateIssueFromAirTableWithInterval(config);
-                const response = await this.airTableApi.createOrUpdateIssueRecord(config, data);
-                if (response && response['id']) {
-                  return await this.createOrUpdateIssueAirtable(issue.id, issue.name, response['id'], project.name);
+                const table = await this.tableAirRepo.findOne({where: {config_id: config.id}});
+                if(table){
+                  const response = await this.airTableApi.createOrUpdateIssueRecord(config, table, data);
+                  if (response && response['id']) {
+                    return await this.createOrUpdateIssueAirtable(issue.id, issue.name, response['id'], project.name);
+                  }
                 }
               })
             }
