@@ -217,6 +217,9 @@ export class GithubService {
       const dbIssue = dbIssues.find(i => i.external_id == issue.external_id && i.repo_id == issue.repo_id);
       if (dbIssue) {
         issue.id = dbIssue.id;
+        if(!issue.estimate){
+          issue.estimate = dbIssue.estimate;
+        }
       }
     })
     return issueEntities;
