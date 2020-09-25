@@ -825,9 +825,9 @@ export class GithubService {
     }
   }
 
-  async getAirConfigs(headers: any): Promise<AirTableConfig> {
+  async getAirConfigs(headers: any): Promise<AirTableConfig[]> {
     const user_id = this.decodePayloadFromHeaders(headers)['sub'];
-    return await this.airConfigRepo.findOne({ where: { user_id: user_id, active: true } });
+    return await this.airConfigRepo.find({ where: { user_id: user_id } });
   }
 
   async deteleAirConfig(config: AirTableConfig) {

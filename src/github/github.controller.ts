@@ -88,7 +88,7 @@ export class GithubController {
         return this.githubService.createOrUpdateAirTableConfig(config);
     }
 
-    @Get('airtable.config')
+    @Get('airtable.configs')
     getAirConfigs(@Headers() headers){
         return this.githubService.getAirConfigs(headers);
     }
