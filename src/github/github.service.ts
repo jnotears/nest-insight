@@ -679,8 +679,7 @@ export class GithubService {
 
   async getSyncProjects(headers: any): Promise<ProjectEntity[]> {
     try {
-      const payload = this.decodePayloadFromHeaders(headers)
-      const repos = await this.getSyncRepos(payload['sub']);
+      const repos = await this.getSyncRepos(headers);
       let projects: ProjectEntity[] = [];
       await Promise.all(repos.map(async repo => {
         const projs = await this.projRepo.find({ where: { repo_id: repo.id } });
@@ -722,9 +721,7 @@ export class GithubService {
 
   async getSyncAssignees(headers: any): Promise<AssigneeResponse[]> {
     try {
-      const payload = this.decodePayloadFromHeaders(headers);
-      console.log(payload);
-      const issues = await this.getSyncIssues(payload['sub']);
+      const issues = await this.getSyncIssues(headers);
       let assignees: AssigneeResponse[] = [];
       await Promise.all(issues.map(async issue => {
         let assigns = await this.assigneeRepo.find({ where: { issue_id: issue.id } });
@@ -797,7 +794,6 @@ export class GithubService {
             const issueAirs = datas['records'];
             issueAirs.forEach(element => {
               const issue = element['fields'];
-              console.log('issue', issue);
               if (issue && issue['Estimate Time']) {
                 this.updateIssue(element['id'], issue['Estimate Time']);
               }
