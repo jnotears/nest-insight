@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Req, Query, Res, UseGuards, Render, Param, Delete, Headers } from "@nestjs/common";
+import { Controller, Post, Body, Get, Req, Query, Res, UseGuards, Render, Param, Delete, Headers, Request } from "@nestjs/common";
 import { GithubLoginDto } from "./dtos/github.ctrl.dto";
 import { GithubService } from "./github.service";
 import { ConfigService } from "@nestjs/config";
@@ -30,14 +30,14 @@ export class GithubController {
 
     @UseGuards(JwtAuthGuard)
     @Get('repos')
-    async getRepos(@Headers() headers) {
-        return await this.githubService.getRepos(headers);
+    async getRepos(@Request() req) {
+        return await this.githubService.getRepos(req.user.id);
     }
 
     @UseGuards(JwtAuthGuard)
     @Get('repos/sync')
-    async getSyncRepos(@Headers() headers) {
-        return await this.githubService.getSyncRepos(headers);
+    async getSyncRepos(@Request() req) {
+        return await this.githubService.getSyncRepos(req.user.id);
     }
 
     @UseGuards(JwtAuthGuard)
@@ -60,20 +60,20 @@ export class GithubController {
 
     @UseGuards(JwtAuthGuard)
     @Get('issues')
-    async getSyncIssues(@Headers() headers) {
-        return this.githubService.getSyncIssues(headers);
+    async getSyncIssues(@Request() req) {
+        return this.githubService.getSyncIssues(req.user.id);
     }
 
     @UseGuards(JwtAuthGuard)
     @Get('projects')
-    async getSyncProjects(@Headers() headers) {
-        return this.githubService.getSyncProjects(headers);
+    async getSyncProjects(@Request() req) {
+        return this.githubService.getSyncProjects(req.user.id);
     }
 
     @UseGuards(JwtAuthGuard)
     @Get('assignees')
-    async getSyncAssignees(@Headers() headers) {
-        return this.githubService.getSyncAssignees(headers);
+    async getSyncAssignees(@Request() req) {
+        return this.githubService.getSyncAssignees(req.user.id);
     }
 
     @Post('hooks.listener/:id')
@@ -89,8 +89,8 @@ export class GithubController {
     }
 
     @Get('airtable.configs')
-    getAirConfigs(@Headers() headers){
-        return this.githubService.getAirConfigs(headers);
+    getAirConfigs(@Request() req){
+        return this.githubService.getAirConfigs(req.user.id);
     }
 
     @Delete('airtable.config')

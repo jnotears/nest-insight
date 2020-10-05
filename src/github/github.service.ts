@@ -542,8 +542,7 @@ export class GithubService {
     }
   }
 
-  async getRepos(headers: any): Promise<RepositoryEntity[]> {
-    const user_id = this.decodePayloadFromHeaders(headers)['sub'];
+  async getRepos(user_id: string): Promise<RepositoryEntity[]> {
     return this.repoRepo.find({
       where: {
         user_id
@@ -647,8 +646,7 @@ export class GithubService {
     }
   }
 
-  async getSyncRepos(headers: any): Promise<RepositoryEntity[]> {
-    const user_id = this.decodePayloadFromHeaders(headers)['sub'];
+  async getSyncRepos(user_id: string): Promise<RepositoryEntity[]> {
     return new Promise(async resovle => {
       try {
         const repos = await this.repoRepo.find({
@@ -661,9 +659,9 @@ export class GithubService {
     })
   }
 
-  async getSyncIssues(headers: any): Promise<IssueEntity[]> {
+  async getSyncIssues(user_id: string): Promise<IssueEntity[]> {
     try {
-      const repos = await this.getSyncRepos(headers);
+      const repos = await this.getSyncRepos(user_id);
       let issues: IssueEntity[] = [];
       await Promise.all(repos.map(async repo => {
         const issueList = await this.issueRepo.find({ where: { repo_id: repo.id } });
@@ -677,9 +675,9 @@ export class GithubService {
     }
   }
 
-  async getSyncProjects(headers: any): Promise<ProjectEntity[]> {
+  async getSyncProjects(user_id: string): Promise<ProjectEntity[]> {
     try {
-      const repos = await this.getSyncRepos(headers);
+      const repos = await this.getSyncRepos(user_id);
       let projects: ProjectEntity[] = [];
       await Promise.all(repos.map(async repo => {
         const projs = await this.projRepo.find({ where: { repo_id: repo.id } });
@@ -712,16 +710,9 @@ export class GithubService {
     return
   }
 
-  private decodePayloadFromHeaders(headers: any): {} {
-    let token: string = headers['authorization'];
-    token = token.split(' ')[1];
-    const payload = this.jwtService.decode(token);
-    return payload;
-  }
-
-  async getSyncAssignees(headers: any): Promise<AssigneeResponse[]> {
+  async getSyncAssignees(user_id: string): Promise<AssigneeResponse[]> {
     try {
-      const issues = await this.getSyncIssues(headers);
+      const issues = await this.getSyncIssues(user_id);
       let assignees: AssigneeResponse[] = [];
       await Promise.all(issues.map(async issue => {
         let assigns = await this.assigneeRepo.find({ where: { issue_id: issue.id } });
@@ -825,9 +816,8 @@ export class GithubService {
     }
   }
 
-  async getAirConfigs(headers: any): Promise<AirTableConfig[]> {
-    const user_id = this.decodePayloadFromHeaders(headers)['sub'];
-    return await this.airConfigRepo.find({ where: { user_id: user_id } });
+  async getAirConfigs(user_id: string): Promise<AirTableConfig[]> {
+    return await this.airConfigRepo.find({ where: { user_id } });
   }
 
   async deteleAirConfig(config: AirTableConfig) {
