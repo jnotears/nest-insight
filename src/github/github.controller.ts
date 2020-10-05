@@ -1,10 +1,9 @@
-import { Controller, Post, Body, Get, Req, Query, Res, UseGuards, Render, Param, Delete, Headers, Request } from "@nestjs/common";
+import { Controller, Post, Body, Get, Req, Query, Res, UseGuards, Render, Param, Delete, Request } from "@nestjs/common";
 import { GithubLoginDto } from "./dtos/github.ctrl.dto";
 import { GithubService } from "./github.service";
 import { ConfigService } from "@nestjs/config";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { AirTableConfig } from "./entities/airtable.config.entity";
-import { config } from "rxjs";
 
 @Controller('api.github')
 export class GithubController {
@@ -49,7 +48,7 @@ export class GithubController {
     @UseGuards(JwtAuthGuard)
     @Post('hooks')
     async registerWebhook(@Body() req) {
-        return this.githubService.registerHook(req);
+        return await this.githubService.registerHook(req);
     }
 
     @UseGuards(JwtAuthGuard)
@@ -59,21 +58,27 @@ export class GithubController {
     }
 
     @UseGuards(JwtAuthGuard)
-    @Get('issues')
+    @Get('issues/sync')
     async getSyncIssues(@Request() req) {
-        return this.githubService.getSyncIssues(req.user.id);
+        return await this.githubService.getSyncIssues(req.user.id);
     }
 
     @UseGuards(JwtAuthGuard)
-    @Get('projects')
+    @Get('projects/sync')
     async getSyncProjects(@Request() req) {
-        return this.githubService.getSyncProjects(req.user.id);
+        return await this.githubService.getSyncProjects(req.user.id);
     }
 
     @UseGuards(JwtAuthGuard)
-    @Get('assignees')
+    @Get('repo/projects')
+    async getProjects(@Query('repo_id') repo_id: number){
+        return await this.githubService.getAllProjectOfRepo(repo_id);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get('assignees/sync')
     async getSyncAssignees(@Request() req) {
-        return this.githubService.getSyncAssignees(req.user.id);
+        return await this.githubService.getSyncAssignees(req.user.id);
     }
 
     @Post('hooks.listener/:id')
@@ -83,48 +88,59 @@ export class GithubController {
         }
     }
 
+    @UseGuards(JwtAuthGuard)
     @Post('airtable.config')
-    createAirConfig(@Body() config: AirTableConfig){
-        return this.githubService.createOrUpdateAirTableConfig(config);
+    async createAirConfig(@Body() config: AirTableConfig){
+        return await this.githubService.createOrUpdateAirTableConfig(config);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Get('airtable.configs')
-    getAirConfigs(@Request() req){
-        return this.githubService.getAirConfigs(req.user.id);
+    async getAirConfigs(@Request() req){
+        console.log(req);
+        return await this.githubService.getAirConfigs(req.user.id);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Delete('airtable.config')
     async removeAirConfig(@Body() config){
         return await this.githubService.deteleAirConfig(config);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Post('airtable.config/project')
     async createtProjectAirtable(@Body() projAir){
         return await this.githubService.createOrUpdateProjectAirTable(projAir);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Get('airtable.config/projects')
     async getProjectAirs(@Query('config_id') config_id: number){
         return await this.githubService.getAllProjectInTable(config_id);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Delete('airtable.config/project')
     async removeProjectAirTable(@Body() projAir){
         return await this.githubService.deleteProjectAirTable(projAir);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Post('airtable.config/table')
     async createTableAirTable(@Body() table){
         return await this.githubService.createOrUpdateTableAirTable(table);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Get('airtable.config/table')
     async getTableAirTableByConfigId(@Query('config_id') config_id: number){
         return await this.githubService.getTableAirTableByConfigId(config_id);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Delete('airtable.config/table/:id')
     async removeTableAirTable(@Param('id') id){
         return await this.githubService.deleteTableAirTable(id);
     }
+
 }

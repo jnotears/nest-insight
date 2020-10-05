@@ -550,6 +550,14 @@ export class GithubService {
     });
   }
 
+  async getAllProjectOfRepo(repo_id: number): Promise<ProjectEntity[]> {
+    try {
+      return this.projRepo.find({ where: { repo_id } });
+    } catch (error) {
+
+    }
+  }
+
   async fetchDatas(user: User, repo: RepositoryEntity) {
     const air_configs = await this.airConfigRepo.find({ where: { user_id: user.id, active: true } })
     const fetchMilestones = await this.fetchMilestones(user.external_token, repo.name, repo.owner, repo.id);
@@ -629,8 +637,8 @@ export class GithubService {
                 const issue = await this.issueRepo.findOne(issueCol.issue_id);
                 const data: AirTableIssueHandling = await this.remapAirTableHandling(config, issue, project.name);
                 this.updateIssueFromAirTableWithInterval(config);
-                const table = await this.tableAirRepo.findOne({where: {config_id: config.id}});
-                if(table){
+                const table = await this.tableAirRepo.findOne({ where: { config_id: config.id } });
+                if (table) {
                   const response = await this.airTableApi.createOrUpdateIssueRecord(config, table, data);
                   if (response && response['id']) {
                     return await this.createOrUpdateIssueAirtable(issue.id, issue.name, response['id'], project.name);
