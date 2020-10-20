@@ -97,7 +97,6 @@ export class GithubController {
     @UseGuards(JwtAuthGuard)
     @Get('airtable.configs')
     async getAirConfigs(@Request() req){
-        console.log(req);
         return await this.githubService.getAirConfigs(req.user.id);
     }
 
